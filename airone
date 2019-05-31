@@ -1,0 +1,204 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""  Airone develop tool.  """
+__author__ = 'luochenxun'
+__version__ = '1.0.0'
+__projectName__ = 'airone'
+
+import getopt
+import sys
+import re
+from sys import argv
+import os.path
+import locale
+import datetime
+import shutil
+import json
+import collections
+import pickle
+import base64
+import time
+
+
+def usage():
+    """ Print the usage as help """
+    print("\n%s is a extensible tool to hook your git projects. version:%s ." %(__projectName__, __version__))
+    print("\nUsage: %s <cmd> [OPTIONS] [param]" % __projectName__)
+    print("  init          : init the environment of the project, write the config in ~/.%s" %__projectName__)
+    print("  -h            : print this usage.")
+    print("  -v            : print the version of %s." % __projectName__)
+    print("\nFor more infomation of the cmd, you can use option as \'%s add -h\' for farther help." % __projectName__)
+    print("")
+    _exit()
+
+
+""" global variables """
+gConfig = None
+M_PROJECT_REPOSITORY = "https://github.com/airone-app/airone-cli.git"
+M_PROJECT_HOME = os.environ['HOME'] + "/.%s/" % __projectName__
+M_PROJECT_SYS_BIN = '/usr/local/bin/' + __projectName__
+M_PROJECT_CONFIG = M_PROJECT_HOME + "config.json"
+M_PROJECT_MAIN_FILE = M_PROJECT_HOME + __projectName__
+
+
+def initEnvironment():
+    # if sys.version_info < (3, 3):
+    #     _exit("Error, the python version need to be greater than 3.3")
+    global gConfig
+    gConfig = _readGlobalConfig()
+    checkAndAutoUpdate()
+
+def newEntry():
+    print('new proj')
+
+def checkAndAutoUpdate(forceUpdate = False):
+    """ Check update half of day """
+    global M_PROJECT_HOME, M_PROJECT_REPOSITORY, M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN
+    global gConfig
+    currentTime = int(time.time())
+    lastUpdateTime = int(gConfig["date"])
+    HalfOneDay = 20 * 60 * 60
+    if (lastUpdateTime + HalfOneDay) < currentTime or forceUpdate:
+        # update the src code
+        homeDir = os.getcwd()
+        os.chdir(M_PROJECT_HOME)
+        os.system("git clean -df 1>/dev/null 2>/dev/null;git reset --hard HEAD 1>/dev/null 2>/dev/null;git pull 1>/dev/null 2>/dev/null")
+        os.chdir(homeDir)
+        # check if githooer has a new update
+        mainFile = open(M_PROJECT_MAIN_FILE)
+        for line in mainFile:
+            match = re.match('__version__ = \'(.+)\'', line)
+            if match:
+                version = match.group(1)
+                versionSplit = version.split('.')
+                currentVersionSplit = gConfig['version'].split('.')
+                gConfig["version"] = version
+                if len(versionSplit) != len(currentVersionSplit):
+                    _autoUpdate()
+                    break
+                for i in range(len(versionSplit)):
+                    if int(versionSplit[i]) > int(currentVersionSplit[i]):
+                        _autoUpdate()
+                        break
+                    elif int(versionSplit[i]) < int(currentVersionSplit[i]):
+                        break
+                break
+        _saveGolbalConfig(gConfig)
+    if not os.path.exists(M_PROJECT_SYS_BIN):
+        _autoUpdate()
+
+def _autoUpdate():
+    global M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN
+    print('A new version existed, now updating...')
+    shutil.copy(M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN)
+    print('Success!')
+
+def _readGlobalConfig():
+    """
+    Return the key-value map in config file:
+    Config.json
+    {
+      version: current tool version
+      date: the newest time of theck update
+    }
+    """
+    global M_PROJECT_CONFIG
+    # default config
+    configDic = collections.OrderedDict()
+    configDic["version"] = __version__
+    configDic["date"] = str(int(time.time()))
+    # create a config file if not exists
+    if not os.path.exists(M_PROJECT_HOME):
+        os.makedirs(M_PROJECT_HOME)
+    if not os.path.exists(M_PROJECT_HOME + '.git'):
+        shutil.rmtree(M_PROJECT_HOME)
+        os.system("git clone " + M_PROJECT_REPOSITORY + ' ' + M_PROJECT_HOME)
+    if not os.path.exists(M_PROJECT_CONFIG):
+        _saveGolbalConfig(configDic)
+    else:  # read the config
+        configReader = open(M_PROJECT_CONFIG, 'r')
+        try:
+            configText = configReader.read()
+            configDic = json.loads(configText, object_pairs_hook=collections.OrderedDict)
+        except Exception as e:
+            _saveGolbalConfig(configDic)
+        finally:
+            configReader.close()
+    return configDic
+
+
+def _saveGolbalConfig(configDic):
+    '''
+    Save the given dic to the project's golbal config path:
+    Config.json
+    {
+      version: current tool version
+      date: the newest time of theck update
+    }
+    '''
+    global M_PROJECT_CONFIG
+    configWritter = open(M_PROJECT_CONFIG, 'w')
+    try:
+        configDic["date"] = str(int(time.time()))
+        configWritter.write(json.dumps(configDic, indent=2))
+    finally:
+        configWritter.close()
+
+
+def _exit(msg=None):
+    if msg != None:
+        print(msg)
+    os._exit(1)
+
+
+def _parseArgv():
+    """
+    pass the cmd & options of the command
+    """
+    if len(sys.argv) <= 1:
+        usage()
+        sys.exit(0)
+    try:
+        cmd = _parseCmd(sys.argv[1], [
+            "update", "new"
+        ])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version"])
+    except getopt.GetoptError as err:
+        print(str(err))
+        usage()
+    try:
+        if cmd:
+            if cmd == "update":
+                checkAndAutoUpdate(True)
+            if cmd == "new":
+                newEntry(sys.argv[2:])
+        else:
+            if not opts:
+                usage()
+            for o, a in opts:
+                if o in ("-h", "--help"):
+                    usage()
+                if o in ("-v", "--version"):
+                    print(__version__)
+                    return
+    except ValueError as err:
+        print(str(err))
+        usage()
+
+
+def _parseCmd(arg, cmds):
+    for c in cmds:
+        if arg == c:
+            return arg
+    return None
+
+
+# you can run the functions of the module or some test methods here
+def main():
+    # check arguments
+    initEnvironment()
+    _parseArgv()
+
+
+if __name__ == "__main__":
+    main()
