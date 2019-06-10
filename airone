@@ -22,9 +22,9 @@ import time
 
 def usage():
     """ Print the usage as help """
-    print("\n%s is a extensible tool to hook your git projects. version:%s ." %(__projectName__, __version__))
+    print("\n%s is a extensible mobile app develop framework. version:%s ." % (__projectName__, __version__))
     print("\nUsage: %s <cmd> [OPTIONS] [param]" % __projectName__)
-    print("  init          : init the environment of the project, write the config in ~/.%s" %__projectName__)
+    print("  init          : init the environment of the project, write the config in ~/.%s" % __projectName__)
     print("  -h            : print this usage.")
     print("  -v            : print the version of %s." % __projectName__)
     print("\nFor more infomation of the cmd, you can use option as \'%s add -h\' for farther help." % __projectName__)
@@ -41,6 +41,22 @@ M_PROJECT_CONFIG = M_PROJECT_HOME + "config.json"
 M_PROJECT_MAIN_FILE = M_PROJECT_HOME + __projectName__
 
 
+class ProjectTempleteInfo:
+    projectName = ''  # the name of the project
+    packageName = ''  # the packageName(Android) or bundleId(iOS)
+    organization = ''  # the project's organization
+    version = ''  # the project's version
+    def __init__(self, projectName='', packageName='', organization=''):
+        '''Constructor.'''
+        self.projectName = projectName
+        self.packageName = packageName
+        self.organization = organization
+    def initFromInteractiveSystem(self):
+        self.projectName = raw_input('· Please input the project\'s name:\n-> ')
+        self.packageName = raw_input('· Please input the packageName(Android) or bundleId(iOS):\n-> ')
+        self.organization = raw_input('· Please input the organization of your project:\n-> ')
+
+
 def initEnvironment():
     # if sys.version_info < (3, 3):
     #     _exit("Error, the python version need to be greater than 3.3")
@@ -48,10 +64,21 @@ def initEnvironment():
     gConfig = _readGlobalConfig()
     checkAndAutoUpdate()
 
-def newEntry():
-    print('new proj')
 
-def checkAndAutoUpdate(forceUpdate = False):
+def newEntry(args):
+    selector = args[0]
+    if selector.startswith('pro'):
+        print('new project')
+        projTemplete = ProjectTempleteInfo()
+        projTemplete.initFromInteractiveSystem()
+        _newProectFromTemplete('./templete', projTemplete)
+    elif selector.startswith('plu'):
+        print('new plugin')
+    else :
+        _exit('args error')
+
+
+def checkAndAutoUpdate(forceUpdate=False):
     """ Check update half of day """
     global M_PROJECT_HOME, M_PROJECT_REPOSITORY, M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN
     global gConfig
@@ -87,11 +114,26 @@ def checkAndAutoUpdate(forceUpdate = False):
     if not os.path.exists(M_PROJECT_SYS_BIN):
         _autoUpdate()
 
+
+# *********************************
+#    New Project
+# *********************************
+
+def _newProectFromTemplete(templeteDir, templeteObj):
+    print('_newProectFromTemplete')
+    # 1. First copy the templete project
+
+
+# *********************************
+#    InitEnvironment
+# *********************************
+
 def _autoUpdate():
     global M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN
     print('A new version existed, now updating...')
     shutil.copy(M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN)
     print('Success!')
+
 
 def _readGlobalConfig():
     """
@@ -144,6 +186,10 @@ def _saveGolbalConfig(configDic):
     finally:
         configWritter.close()
 
+
+# *********************************
+#    Cli methods
+# *********************************
 
 def _exit(msg=None):
     if msg != None:
