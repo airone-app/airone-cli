@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """  Airone develop tool.  """
 __author__ = 'luochenxun'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __projectName__ = 'airone'
 
 import getopt
@@ -32,6 +32,15 @@ def usage():
     _exit()
 
 
+def newUsage():
+    """ Print the usage of cmd \'new\' """
+    print("\nUsage: %s new [OPTIONS] [param]\n" % __projectName__)
+    print("%s new project   :   Create a new airone project ." % __projectName__)
+    print("%s new plugin    :   Create a new airone plugin ." % __projectName__)
+    print("")
+    _exit()
+
+
 """ global variables """
 gConfig = None
 M_PROJECT_REPOSITORY = "https://github.com/airone-app/airone-cli.git"
@@ -46,14 +55,16 @@ class ProjectTempleteInfo:
     packageName = ''  # the packageName(Android) or bundleId(iOS)
     organization = ''  # the project's organization
     version = ''  # the project's version
+
     def __init__(self, projectName='', packageName='', organization=''):
         '''Constructor.'''
         self.projectName = projectName
         self.packageName = packageName
         self.organization = organization
+
     def initFromInteractiveSystem(self):
         self.projectName = raw_input('· Please input the project\'s name:\n-> ')
-        self.packageName = raw_input('· Please input the packageName(Android) or bundleId(iOS):\n-> ')
+        self.packageName = raw_input('· Please input the packageName(Android)/bundleId(iOS):\n-> ')
         self.organization = raw_input('· Please input the organization of your project:\n-> ')
 
 
@@ -66,6 +77,8 @@ def initEnvironment():
 
 
 def newEntry(args):
+    if args == None or len(args) == 0:
+        newUsage()
     selector = args[0]
     if selector.startswith('pro'):
         print('new project')
@@ -74,8 +87,8 @@ def newEntry(args):
         _newProectFromTemplete('./templete', projTemplete)
     elif selector.startswith('plu'):
         print('new plugin')
-    else :
-        _exit('args error')
+    else:
+        newUsage()
 
 
 def checkAndAutoUpdate(forceUpdate=False):
@@ -120,13 +133,43 @@ def checkAndAutoUpdate(forceUpdate=False):
 # *********************************
 
 def _newProectFromTemplete(templeteDir, templeteObj):
-    print('_newProectFromTemplete')
     # 1. First copy the templete project
+    if os.path.exists(templeteObj.projectName):
+        sure = raw_input('· Project already exists, recover it or not？\'Y(es)\'，\'N(o)\' \n-> ')
+        if sure.lower()[0] != 'n':
+            shutil.rmtree(templeteObj.projectName)
+    shutil.copytree(templeteDir, templeteObj.projectName)
+    _renameDirsAndFilesNameInDir(templeteObj.projectName, templeteObj)
 
+
+def _renameDirsAndFilesNameInDir(dir, templeteObj):
+    for fileItem in os.listdir(dir):
+        fileItemPath = os.path.join(dir, fileItem)
+        fileItemPathNew = os.path.join(dir, fileItem.replace('XXXX', templeteObj.projectName))
+        if fileItemPath != fileItemPathNew:
+            shutil.move(fileItemPath, fileItemPathNew)
+        if os.path.isdir(fileItemPathNew):
+            _renameDirsAndFilesNameInDir(fileItemPathNew, templeteObj)
+        else:
+            _filterFilesContent(fileItemPathNew, templeteObj)
+
+
+def _filterFilesContent(filePath, templeteObj):
+    rfp = open(filePath)  # 打开文件，读入每一行
+    lines = rfp.readlines()
+    fp = open(filePath + '_tmp', 'w')  # 打开你要写得文件test2.txt
+    for s in lines:
+        s = s.replace('XXXX', templeteObj.projectName)
+        fp.write(s)
+    rfp.close()
+    fp.close()
+    os.remove(filePath)
+    shutil.move(filePath + '_tmp', filePath)
 
 # *********************************
 #    InitEnvironment
 # *********************************
+
 
 def _autoUpdate():
     global M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN

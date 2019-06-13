@@ -1,0 +1,17 @@
+use_frameworks!
+inhibit_all_warnings!
+
+target 'XXXX' do
+
+  # --- AirOne基础库
+  # {
+    pod 'AirBase', :git => 'https://github.com/airone-app/AirBase.git', :branch => 'master'
+
+    # 网络库
+    # {
+      pod 'AirRequest', :git => 'https://github.com/airone-app/AirRequest.git', :branch => 'master'
+      pod 'AirRequestAFImpl', :git => 'https://github.com/airone-app/AirRequestAFImpl.git', :branch => 'master'
+    # }
+  # }
+
+end
