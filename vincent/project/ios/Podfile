@@ -1,0 +1,10 @@
+use_frameworks!
+inhibit_all_warnings!
+
+target 'vincent' do
+
+# ----- this is generate by airone
+
+# ----- end of airone
+
+end

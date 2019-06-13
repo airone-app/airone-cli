@@ -43,11 +43,15 @@ def newUsage():
 
 """ global variables """
 gConfig = None
-M_PROJECT_REPOSITORY = "https://github.com/airone-app/airone-cli.git"
-M_PROJECT_HOME = os.environ['HOME'] + "/.%s/" % __projectName__
-M_PROJECT_SYS_BIN = '/usr/local/bin/' + __projectName__
-M_PROJECT_CONFIG = M_PROJECT_HOME + "config.json"
-M_PROJECT_MAIN_FILE = M_PROJECT_HOME + __projectName__
+gProjectConfig = {}
+gModules = []
+gDevModules = []
+M_AIRONE_REPOSITORY = "https://github.com/airone-app/airone-cli.git"
+M_AIRONE_HOME = os.environ['HOME'] + "/.%s/" % __projectName__
+M_AIRONE_SYS_BIN = '/usr/local/bin/' + __projectName__
+M_AIRONE_CONFIG = M_AIRONE_HOME + "config.json"
+M_AIRONE_MAIN_FILE = M_AIRONE_HOME + __projectName__
+M_PROJECT_CONFIG = 'airone.json'
 
 
 class ProjectTempleteInfo:
@@ -67,6 +71,15 @@ class ProjectTempleteInfo:
         self.packageName = raw_input('· Please input the packageName(Android)/bundleId(iOS):\n-> ')
         self.organization = raw_input('· Please input the organization of your project:\n-> ')
 
+class Air:
+    name = ''  # the name of the project
+    git = ''  # the packageName(Android) or bundleId(iOS)
+    branch = ''  # the project's organization
+    def __init__(self, airDic={}):
+        '''Constructor.'''
+        self.name = airDic['name'] if 'name' in airDic else ''
+        self.git = airDic['git'] if 'git' in airDic else ''
+        self.branch = airDic['branch'] if 'branch' in airDic else 'master'
 
 def initEnvironment():
     # if sys.version_info < (3, 3):
@@ -84,16 +97,22 @@ def newEntry(args):
         print('new project')
         projTemplete = ProjectTempleteInfo()
         projTemplete.initFromInteractiveSystem()
-        _newProectFromTemplete('./templete', projTemplete)
+        _newProectFromTemplete('./templete/project', projTemplete)
     elif selector.startswith('plu'):
         print('new plugin')
     else:
         newUsage()
 
+def installEntry():
+    _readProjectConfig()
+    _downloadModules()
+    _rewriteProjectDependencies()
+    _syncProjectDependencies()
+    print('Success to install all modules!')
 
 def checkAndAutoUpdate(forceUpdate=False):
     """ Check update half of day """
-    global M_PROJECT_HOME, M_PROJECT_REPOSITORY, M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN
+    global M_AIRONE_HOME, M_AIRONE_REPOSITORY, M_AIRONE_MAIN_FILE, M_AIRONE_SYS_BIN
     global gConfig
     currentTime = int(time.time())
     lastUpdateTime = int(gConfig["date"])
@@ -101,11 +120,11 @@ def checkAndAutoUpdate(forceUpdate=False):
     if (lastUpdateTime + HalfOneDay) < currentTime or forceUpdate:
         # update the src code
         homeDir = os.getcwd()
-        os.chdir(M_PROJECT_HOME)
+        os.chdir(M_AIRONE_HOME)
         os.system("git clean -df 1>/dev/null 2>/dev/null;git reset --hard HEAD 1>/dev/null 2>/dev/null;git pull 1>/dev/null 2>/dev/null")
         os.chdir(homeDir)
         # check if githooer has a new update
-        mainFile = open(M_PROJECT_MAIN_FILE)
+        mainFile = open(M_AIRONE_MAIN_FILE)
         for line in mainFile:
             match = re.match('__version__ = \'(.+)\'', line)
             if match:
@@ -124,8 +143,97 @@ def checkAndAutoUpdate(forceUpdate=False):
                         break
                 break
         _saveGolbalConfig(gConfig)
-    if not os.path.exists(M_PROJECT_SYS_BIN):
+    if not os.path.exists(M_AIRONE_SYS_BIN):
         _autoUpdate()
+
+
+# *********************************
+#    InstallEntry
+# *********************************
+
+def _readProjectConfig():
+    global M_PROJECT_CONFIG
+    global gProjectConfig, gModules, gDevModules
+    configPath = os.path.join(os.getcwd(), M_PROJECT_CONFIG)
+    if not os.path.isfile(configPath):
+        _exit('Config file not found! Please to go airone\'s homepage to see what to do.')
+    # main logic
+    # Read project config from airone.json
+    configFile = open(M_PROJECT_CONFIG, 'r')
+    try:
+        configText = configFile.read()
+        gProjectConfig = json.loads(configText, object_pairs_hook=collections.OrderedDict)
+    except Exception as e:
+        _exit('Read airone.json failed!')
+    finally:
+        configFile.close()
+    if('modules' in gProjectConfig and len(gProjectConfig['modules']) > 0):
+        gModules = map(lambda x: Air(x) ,gProjectConfig['modules'])
+    if('devModules' in gProjectConfig and len(gProjectConfig['devModules']) > 0):
+        gDevModules = map(lambda x: Air(x) ,gProjectConfig['devModules'])
+
+def _downloadModules():
+    global gProjectConfig, gModules, gDevModules
+    print('Analyzing develop modules')
+    if len(gDevModules) > 0:
+        for air in gDevModules:
+            if os.path.exists('./developModules/%s' %air.name):
+                print('Module %s is already exist, if you want to update it, please remove the module manually\n' %air.name)
+            else:
+                print('\nCloning module:%s' %air.name)
+                os.system("git clone -b %s %s %s"%(air.branch, air.git, './developModules/%s'%air.name))
+
+
+def _rewriteProjectDependencies():
+    # for iOS
+    _rewriteIOSPodfile('./ios/Podfile')
+
+
+def _rewriteIOSPodfile(podfile):
+    global gProjectConfig, gModules, gDevModules
+    M_GenerateTextHead = '# ----- this is generate by airone'
+    M_GenerateTextTail = '# ----- end of airone'
+    # main logic
+    rfp = open(podfile)
+    fp = open(podfile + '_tmp','w')  #打开你要写得文件test2.txt
+    lines = rfp.readlines()
+    newLines = []
+    newLines.append('# ----- this is generate by airone')
+    newLines.append('# ----- end of airone')
+    isRewriteBefore = False
+    for s in lines:
+        if M_GenerateTextHead in s:
+            isRewriteBefore = True
+            break;
+    # docStart = False
+    # docEnd = False
+    # for s in lines:
+    #     # doc end
+    #     if docEnd == True:
+    #         newLines.append(s)
+    #         continue
+    #     # doc start
+    #     if docStart == False and s.strip().startswith('target'):
+    #         docStart = True
+    #         continue
+    #     if docStart == True and s.strip().startswith('//'):
+    #         continue
+    #     elif docStart == True:
+    #         docEnd = True
+    #     newLines.append(s)
+    # fp.writelines(newLines)
+    # fp.close
+    # rfp.close
+    # os.remove(filepath)
+    # shutil.move(filepath + '_tmp', filepath)
+
+def _syncProjectDependencies():
+    pass
+    # for iOS
+    # backDir = os.getcwd()
+    # os.chdir('ios')
+    # os.system('pod update --no-repo-update --verbose')
+    # os.chdir(backDir)
 
 
 # *********************************
@@ -172,9 +280,9 @@ def _filterFilesContent(filePath, templeteObj):
 
 
 def _autoUpdate():
-    global M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN
+    global M_AIRONE_MAIN_FILE, M_AIRONE_SYS_BIN
     print('A new version existed, now updating...')
-    shutil.copy(M_PROJECT_MAIN_FILE, M_PROJECT_SYS_BIN)
+    shutil.copy(M_AIRONE_MAIN_FILE, M_AIRONE_SYS_BIN)
     print('Success!')
 
 
@@ -187,21 +295,21 @@ def _readGlobalConfig():
       date: the newest time of theck update
     }
     """
-    global M_PROJECT_CONFIG
+    global M_AIRONE_CONFIG
     # default config
     configDic = collections.OrderedDict()
     configDic["version"] = __version__
     configDic["date"] = str(int(time.time()))
     # create a config file if not exists
-    if not os.path.exists(M_PROJECT_HOME):
-        os.makedirs(M_PROJECT_HOME)
-    if not os.path.exists(M_PROJECT_HOME + '.git'):
-        shutil.rmtree(M_PROJECT_HOME)
-        os.system("git clone " + M_PROJECT_REPOSITORY + ' ' + M_PROJECT_HOME)
-    if not os.path.exists(M_PROJECT_CONFIG):
+    if not os.path.exists(M_AIRONE_HOME):
+        os.makedirs(M_AIRONE_HOME)
+    if not os.path.exists(M_AIRONE_HOME + '.git'):
+        shutil.rmtree(M_AIRONE_HOME)
+        os.system("git clone " + M_AIRONE_REPOSITORY + ' ' + M_AIRONE_HOME)
+    if not os.path.exists(M_AIRONE_CONFIG):
         _saveGolbalConfig(configDic)
     else:  # read the config
-        configReader = open(M_PROJECT_CONFIG, 'r')
+        configReader = open(M_AIRONE_CONFIG, 'r')
         try:
             configText = configReader.read()
             configDic = json.loads(configText, object_pairs_hook=collections.OrderedDict)
@@ -221,8 +329,8 @@ def _saveGolbalConfig(configDic):
       date: the newest time of theck update
     }
     '''
-    global M_PROJECT_CONFIG
-    configWritter = open(M_PROJECT_CONFIG, 'w')
+    global M_AIRONE_CONFIG
+    configWritter = open(M_AIRONE_CONFIG, 'w')
     try:
         configDic["date"] = str(int(time.time()))
         configWritter.write(json.dumps(configDic, indent=2))
@@ -249,7 +357,7 @@ def _parseArgv():
         sys.exit(0)
     try:
         cmd = _parseCmd(sys.argv[1], [
-            "update", "new"
+            "update", "new", 'install'
         ])
         opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version"])
     except getopt.GetoptError as err:
@@ -261,6 +369,8 @@ def _parseArgv():
                 checkAndAutoUpdate(True)
             if cmd == "new":
                 newEntry(sys.argv[2:])
+            if cmd == 'install':
+                installEntry()
         else:
             if not opts:
                 usage()
