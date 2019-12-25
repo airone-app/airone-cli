@@ -1,10 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """  Airone develop tool.  """
 __author__ = 'luochenxun'
-__version__ = '1.1.0'
+__version__ = '1.0.0'
 __projectName__ = 'airone'
 
+# region [ import ] import
 import getopt
 import sys
 import re
@@ -18,34 +19,59 @@ import collections
 import pickle
 import base64
 import time
+from watchdog.observers import Observer
+from watchdog.events import *
+from threading import Thread
+#endregion
 
+# region [sub] usages
 
 def usage():
     """ Print the usage as help """
     print("\n%s is a extensible mobile app develop framework. version:%s ." % (__projectName__, __version__))
     print("\nUsage: %s <cmd> [OPTIONS] [param]" % __projectName__)
     print("  init          : init the environment of the project, write the config in ~/.%s" % __projectName__)
+    print("  new           : create airone project or module.")
+    print("  install       : install all dependencies by airone.json.")
+    print("  boxapp        : build a boxapp.")
     print("  -h            : print this usage.")
     print("  -v            : print the version of %s." % __projectName__)
     print("\nFor more infomation of the cmd, you can use option as \'%s add -h\' for farther help." % __projectName__)
     print("")
     _exit()
 
-
 def newUsage():
     """ Print the usage of cmd \'new\' """
     print("\nUsage: %s new [OPTIONS] [param]\n" % __projectName__)
     print("%s new project   :   Create a new airone project ." % __projectName__)
-    print("%s new plugin    :   Create a new airone plugin ." % __projectName__)
+    print("%s new module    :   Create a new airone module ." % __projectName__)
+    print("%s new boxapp    :   Create a new airone box-app ." % __projectName__)
     print("")
     _exit()
 
+def boxUsage():
+    """ Print the usage of cmd \'boxapp\' """
+    print("\nUsage: %s boxapp [param] -[OPTIONS]\n" % __projectName__)
+    print("%s boxapp weapp       :   Build weixin mini app ." % __projectName__)
+    print("%s boxapp weapp -d    :   Debug weixin mini app ." % __projectName__)
+    print("%s boxapp baidu       :   Build baidu mini app ." % __projectName__)
+    print("%s boxapp baidu -d    :   Debug baidu mini app ." % __projectName__)
+    print("%s boxapp h5          :   Build baidu h5 app ." % __projectName__)
+    print("%s boxapp h5 -d       :   Debug baidu h5 app ." % __projectName__)
+    print("%s boxapp rn          :   Build baidu rn app ." % __projectName__)
+    print("%s boxapp rn -d       :   Debug baidu rn app ." % __projectName__)
+    print("")
+    _exit()
+
+# endregion
 
 """ global variables """
 gConfig = None
 gProjectConfig = {}
 gModules = []
 gDevModules = []
+gLoadingStop = True
+gDebug = False
 M_AIRONE_REPOSITORY = "https://github.com/airone-app/airone-cli.git"
 M_AIRONE_HOME = os.environ['HOME'] + "/.%s/" % __projectName__
 M_AIRONE_SYS_BIN = '/usr/local/bin/' + __projectName__
@@ -53,6 +79,7 @@ M_AIRONE_CONFIG = M_AIRONE_HOME + "config.json"
 M_AIRONE_MAIN_FILE = M_AIRONE_HOME + __projectName__
 M_PROJECT_CONFIG = 'airone.json'
 
+# region [sub] class define
 
 class ProjectTempleteInfo:
     projectName = ''  # the name of the project
@@ -68,8 +95,9 @@ class ProjectTempleteInfo:
 
     def initFromInteractiveSystem(self):
         self.projectName = raw_input('· Please input the project\'s name:\n-> ')
-        self.packageName = raw_input('· Please input the packageName(Android)/bundleId(iOS):\n-> ')
+        self.packageName = raw_input('· Please input the packageName(Android) or bundleId(iOS):\n-> ')
         self.organization = raw_input('· Please input the organization of your project:\n-> ')
+        return self
 
 class Air:
     name = ''  # the name of the project
@@ -81,6 +109,13 @@ class Air:
         self.git = airDic['git'] if 'git' in airDic else ''
         self.branch = airDic['branch'] if 'branch' in airDic else 'master'
 
+# endregion
+
+# region [main] init
+# *********************************
+#    InitEnvironment
+# *********************************
+
 def initEnvironment():
     # if sys.version_info < (3, 3):
     #     _exit("Error, the python version need to be greater than 3.3")
@@ -89,194 +124,6 @@ def initEnvironment():
     checkAndAutoUpdate()
 
 
-def newEntry(args):
-    if args == None or len(args) == 0:
-        newUsage()
-    selector = args[0]
-    if selector.startswith('pro'):
-        print('new project')
-        projTemplete = ProjectTempleteInfo()
-        projTemplete.initFromInteractiveSystem()
-        _newProectFromTemplete('./templete/project', projTemplete)
-    elif selector.startswith('plu'):
-        print('new plugin')
-    else:
-        newUsage()
-
-def installEntry():
-    _readProjectConfig()
-    _downloadModules()
-    _rewriteProjectDependencies()
-    _syncProjectDependencies()
-    print('Success to install all modules!')
-
-def checkAndAutoUpdate(forceUpdate=False):
-    """ Check update half of day """
-    global M_AIRONE_HOME, M_AIRONE_REPOSITORY, M_AIRONE_MAIN_FILE, M_AIRONE_SYS_BIN
-    global gConfig
-    currentTime = int(time.time())
-    lastUpdateTime = int(gConfig["date"])
-    HalfOneDay = 20 * 60 * 60
-    if (lastUpdateTime + HalfOneDay) < currentTime or forceUpdate:
-        # update the src code
-        homeDir = os.getcwd()
-        os.chdir(M_AIRONE_HOME)
-        os.system("git clean -df 1>/dev/null 2>/dev/null;git reset --hard HEAD 1>/dev/null 2>/dev/null;git pull 1>/dev/null 2>/dev/null")
-        os.chdir(homeDir)
-        # check if githooer has a new update
-        mainFile = open(M_AIRONE_MAIN_FILE)
-        for line in mainFile:
-            match = re.match('__version__ = \'(.+)\'', line)
-            if match:
-                version = match.group(1)
-                versionSplit = version.split('.')
-                currentVersionSplit = gConfig['version'].split('.')
-                gConfig["version"] = version
-                if len(versionSplit) != len(currentVersionSplit):
-                    _autoUpdate()
-                    break
-                for i in range(len(versionSplit)):
-                    if int(versionSplit[i]) > int(currentVersionSplit[i]):
-                        _autoUpdate()
-                        break
-                    elif int(versionSplit[i]) < int(currentVersionSplit[i]):
-                        break
-                break
-        _saveGolbalConfig(gConfig)
-    if not os.path.exists(M_AIRONE_SYS_BIN):
-        _autoUpdate()
-
-
-# *********************************
-#    InstallEntry
-# *********************************
-
-def _readProjectConfig():
-    global M_PROJECT_CONFIG
-    global gProjectConfig, gModules, gDevModules
-    configPath = os.path.join(os.getcwd(), M_PROJECT_CONFIG)
-    if not os.path.isfile(configPath):
-        _exit('Config file not found! Please to go airone\'s homepage to see what to do.')
-    # main logic
-    # Read project config from airone.json
-    configFile = open(M_PROJECT_CONFIG, 'r')
-    try:
-        configText = configFile.read()
-        gProjectConfig = json.loads(configText, object_pairs_hook=collections.OrderedDict)
-    except Exception as e:
-        _exit('Read airone.json failed!')
-    finally:
-        configFile.close()
-    if('modules' in gProjectConfig and len(gProjectConfig['modules']) > 0):
-        gModules = map(lambda x: Air(x) ,gProjectConfig['modules'])
-    if('devModules' in gProjectConfig and len(gProjectConfig['devModules']) > 0):
-        gDevModules = map(lambda x: Air(x) ,gProjectConfig['devModules'])
-
-def _downloadModules():
-    global gProjectConfig, gModules, gDevModules
-    print('Analyzing develop modules')
-    if len(gDevModules) > 0:
-        for air in gDevModules:
-            if os.path.exists('./developModules/%s' %air.name):
-                print('Module %s is already exist, if you want to update it, please remove the module manually\n' %air.name)
-            else:
-                print('\nCloning module:%s' %air.name)
-                os.system("git clone -b %s %s %s"%(air.branch, air.git, './developModules/%s'%air.name))
-
-
-def _rewriteProjectDependencies():
-    # for iOS
-    _rewriteIOSPodfile('./ios/Podfile')
-
-
-def _rewriteIOSPodfile(podfile):
-    global gProjectConfig, gModules, gDevModules
-    M_GenerateTextHead = '# ----- this is generate by airone'
-    M_GenerateTextTail = '# ----- end of airone'
-    # main logic
-    rfp = open(podfile)
-    fp = open(podfile + '_tmp','w')  #打开你要写得文件test2.txt
-    lines = rfp.readlines()
-    newLines = []
-    newLines.append('# ----- this is generate by airone')
-    newLines.append('# ----- end of airone')
-    isRewriteBefore = False
-    for s in lines:
-        if M_GenerateTextHead in s:
-            isRewriteBefore = True
-            break;
-    # docStart = False
-    # docEnd = False
-    # for s in lines:
-    #     # doc end
-    #     if docEnd == True:
-    #         newLines.append(s)
-    #         continue
-    #     # doc start
-    #     if docStart == False and s.strip().startswith('target'):
-    #         docStart = True
-    #         continue
-    #     if docStart == True and s.strip().startswith('//'):
-    #         continue
-    #     elif docStart == True:
-    #         docEnd = True
-    #     newLines.append(s)
-    # fp.writelines(newLines)
-    # fp.close
-    # rfp.close
-    # os.remove(filepath)
-    # shutil.move(filepath + '_tmp', filepath)
-
-def _syncProjectDependencies():
-    pass
-    # for iOS
-    # backDir = os.getcwd()
-    # os.chdir('ios')
-    # os.system('pod update --no-repo-update --verbose')
-    # os.chdir(backDir)
-
-
-# *********************************
-#    New Project
-# *********************************
-
-def _newProectFromTemplete(templeteDir, templeteObj):
-    # 1. First copy the templete project
-    if os.path.exists(templeteObj.projectName):
-        sure = raw_input('· Project already exists, recover it or not？\'Y(es)\'，\'N(o)\' \n-> ')
-        if sure.lower()[0] != 'n':
-            shutil.rmtree(templeteObj.projectName)
-    shutil.copytree(templeteDir, templeteObj.projectName)
-    _renameDirsAndFilesNameInDir(templeteObj.projectName, templeteObj)
-
-
-def _renameDirsAndFilesNameInDir(dir, templeteObj):
-    for fileItem in os.listdir(dir):
-        fileItemPath = os.path.join(dir, fileItem)
-        fileItemPathNew = os.path.join(dir, fileItem.replace('XXXX', templeteObj.projectName))
-        if fileItemPath != fileItemPathNew:
-            shutil.move(fileItemPath, fileItemPathNew)
-        if os.path.isdir(fileItemPathNew):
-            _renameDirsAndFilesNameInDir(fileItemPathNew, templeteObj)
-        else:
-            _filterFilesContent(fileItemPathNew, templeteObj)
-
-
-def _filterFilesContent(filePath, templeteObj):
-    rfp = open(filePath)  # 打开文件，读入每一行
-    lines = rfp.readlines()
-    fp = open(filePath + '_tmp', 'w')  # 打开你要写得文件test2.txt
-    for s in lines:
-        s = s.replace('XXXX', templeteObj.projectName)
-        fp.write(s)
-    rfp.close()
-    fp.close()
-    os.remove(filePath)
-    shutil.move(filePath + '_tmp', filePath)
-
-# *********************************
-#    InitEnvironment
-# *********************************
 
 
 def _autoUpdate():
@@ -313,7 +160,7 @@ def _readGlobalConfig():
         try:
             configText = configReader.read()
             configDic = json.loads(configText, object_pairs_hook=collections.OrderedDict)
-        except Exception as e:
+        except Exception:
             _saveGolbalConfig(configDic)
         finally:
             configReader.close()
@@ -337,10 +184,350 @@ def _saveGolbalConfig(configDic):
     finally:
         configWritter.close()
 
+# endregion
 
+# region [main] new
+# *********************************
+#    New Project
+# *********************************
+
+def newEntry(args):
+    if args == None or len(args) == 0:
+        newUsage()
+    selector = args[0]
+    if selector.startswith('pro'):
+        _newProectFromTemplete('./templete/project', ProjectTempleteInfo().initFromInteractiveSystem())
+    elif selector.startswith('mod'):
+        print('new module')
+    elif selector.startswith('box'):
+        print('new box-app')
+    else:
+        newUsage()
+
+def _newProectFromTemplete(templeteDir, templeteObj):
+    # 1. First copy the templete project
+    if os.path.exists(templeteObj.projectName):
+        sure = raw_input('· Project already exists, recover it or not？\'Y(es)\'，\'N(o)\' \n-> ')
+        if sure.lower()[0] != 'n':
+            shutil.rmtree(templeteObj.projectName)
+        else:
+            _exit()
+    shutil.copytree(templeteDir, templeteObj.projectName)
+    _renameDirsAndFilesNameInDir(templeteObj.projectName, templeteObj)
+
+
+def _renameDirsAndFilesNameInDir(dir, templeteObj):
+    for fileItem in os.listdir(dir):
+        fileItemPath = os.path.join(dir, fileItem)
+        fileItemPathNew = os.path.join(dir, fileItem.replace('XXXX', templeteObj.projectName))
+        if fileItemPath != fileItemPathNew:
+            shutil.move(fileItemPath, fileItemPathNew)
+        if os.path.isdir(fileItemPathNew):
+            _renameDirsAndFilesNameInDir(fileItemPathNew, templeteObj)
+        else:
+            _filterFilesContent(fileItemPathNew, templeteObj)
+
+
+def _filterFilesContent(filePath, templeteObj):
+    rfp = open(filePath)  # 打开文件，读入每一行
+    lines = rfp.readlines()
+    fp = open(filePath + '_tmp', 'w')  # 打开你要写得文件test2.txt
+    for s in lines:
+        s = s.replace('XXXX', templeteObj.projectName)
+        fp.write(s)
+    rfp.close()
+    fp.close()
+    os.remove(filePath)
+    shutil.move(filePath + '_tmp', filePath)
+
+# endregion
+
+# region [main] install
+# *********************************
+#    InstallEntry
+# *********************************
+
+def installEntry():
+    '''Install all dependences by airone.json.'''
+    _readProjectConfig()
+    _downloadModules()
+    # install project by system
+    # iOS
+    # {
+    _rewriteIOSPodfile(_checkAndGetIOSPath())
+    _syncIOSProjectDependencies(_checkAndGetIOSPath())
+    # }
+    # Android
+    # {
+    # }
+    print('Success to install all modules!')
+
+def _readProjectConfig():
+    global M_PROJECT_CONFIG
+    global gProjectConfig, gModules, gDevModules
+    configPath = os.path.join(os.getcwd(), M_PROJECT_CONFIG)
+    if not os.path.isfile(configPath):
+        _exit('Config file not found! Please to go airone\'s homepage to see what to do.')
+    # main logic
+    # Read project config from airone.json
+    configFile = open(M_PROJECT_CONFIG, 'r')
+    try:
+        configText = configFile.read()
+        gProjectConfig = json.loads(configText, object_pairs_hook=collections.OrderedDict)
+    except Exception as e:
+        _exit('Read airone.json failed!')
+    finally:
+        configFile.close()
+    if('modules' in gProjectConfig and len(gProjectConfig['modules']) > 0):
+        gModules = map(lambda x: Air(x) ,gProjectConfig['modules'])
+    if('devModules' in gProjectConfig and len(gProjectConfig['devModules']) > 0):
+        gDevModules = map(lambda x: Air(x) ,gProjectConfig['devModules'])
+
+def _downloadModules():
+    global gProjectConfig, gModules, gDevModules
+    print('Analyzing develop modules')
+    if len(gDevModules) > 0:
+        for air in gDevModules:
+            if os.path.exists('./developModules/%s' %air.name):
+                print('Module %s is already exist, if you want to update it, please remove the module manually\n' %air.name)
+            else:
+                print('\nCloning module:%s' %air.name)
+                os.system("git clone -b %s %s %s"%(air.branch, air.git, './developModules/%s'%air.name))
+
+def _checkAndGetIOSPath():
+    if os.path.exists('./ios'):
+        return './ios'
+    elif os.path.exists('../ios'):
+        return '../ios'
+    return os.getcwd()
+
+def _rewriteIOSPodfile(iosPath):
+    global gProjectConfig, gModules, gDevModules
+    M_GenerateTextHead = '# ----- this is generate by airone(don\'t edit)'
+    M_GenerateTextTail = '# ----- end of airone'
+    podfile = os.path.join(iosPath, 'Podfile')
+    if not os.path.exists(podfile):
+        _exit('Error, iOS Podfile not exist!')
+    # main logic
+    rfp = open(podfile)
+    fp = open(podfile + '_tmp','w')  #打开你要写得文件test2.txt
+    originLines = rfp.readlines()
+    newFileLines = []
+    isRewriteBefore = False
+    for line in originLines:
+        if M_GenerateTextHead in line:
+            isRewriteBefore = True
+            break;
+    if isRewriteBefore == True:
+        isAironeModulesEntry = False
+        for line in originLines:
+            if isAironeModulesEntry == True and M_GenerateTextTail not in line:
+                continue
+            elif isAironeModulesEntry == True and M_GenerateTextTail in line:
+                isAironeModulesEntry = False
+            elif M_GenerateTextHead in line:
+                isAironeModulesEntry = True
+                newFileLines.append(line)
+                newFileLines.append('\n# development modules: \n\n')
+                for module in gDevModules:
+                    newFileLines.append('pod \'%s\', :path => \'../developModules/%s\'\n\n' %(module.name, module.name))
+                newFileLines.append('\n# reference modules: \n\n')
+                for module in gModules:
+                    newFileLines.append('pod \'%s\', :git => \'%s\', :branch => \'%s\'\n\n' %(module.name, module.git, module.branch))
+                continue
+            newFileLines.append(line)
+    else:
+        isTargetEntry = False
+        for line in originLines:
+            if isTargetEntry == False and line.strip().startswith('target'):
+                newFileLines.append(line)
+                isTargetEntry = True
+                newFileLines.append('\n')
+                newFileLines.append(M_GenerateTextHead)
+                newFileLines.append('\n\n# develop modules: \n\n')
+                for module in gDevModules:
+                    newFileLines.append('pod \'%s\', :path => \'../developModules/%s\'\n\n' %(module.name, module.name))
+                newFileLines.append('\n# reference modules: \n\n')
+                for module in gModules:
+                    newFileLines.append('pod \'%s\', :git => \'%s\', :branch => \'%s\'\n\n' %(module.name, module.git, module.branch))
+                newFileLines.append(M_GenerateTextTail)
+                newFileLines.append('\n\n')
+                continue
+            newFileLines.append(line)
+    fp.writelines(newFileLines)
+    rfp.close()
+    fp.close()
+    shutil.move(podfile + '_tmp', podfile)
+
+def _syncIOSProjectDependencies(iosPath):
+    backDir = os.getcwd()
+    os.chdir(iosPath)
+    os.system('pod update --no-repo-update --verbose')
+    os.chdir(backDir)
+
+# endregion
+
+# region [main] autoupdate
+# *********************************
+#    autoupdate
+# *********************************
+def checkAndAutoUpdate(forceUpdate=False):
+    """ Check update half of day """
+    global M_AIRONE_HOME, M_AIRONE_REPOSITORY, M_AIRONE_MAIN_FILE, M_AIRONE_SYS_BIN
+    global gConfig
+    currentTime = int(time.time())
+    lastUpdateTime = int(gConfig["date"])
+    HalfOneDay = 20 * 60 * 60
+    if (lastUpdateTime + HalfOneDay) < currentTime or forceUpdate:
+        _loading(True, 'Self updating, please wait') # showloading
+        # update the src code
+        homeDir = os.getcwd()
+        os.chdir(M_AIRONE_HOME)
+        os.system("git clean -df 1>/dev/null 2>/dev/null;git reset --hard HEAD 1>/dev/null 2>/dev/null;git pull 1>/dev/null 2>/dev/null")
+        os.chdir(homeDir)
+        _loading(False)
+        # check if githooer has a new update
+        mainFile = open(M_AIRONE_MAIN_FILE)
+        for line in mainFile:
+            match = re.match('__version__ = \'(.+)\'', line)
+            if match:
+                version = match.group(1)
+                versionSplit = version.split('.')
+                currentVersionSplit = gConfig['version'].split('.')
+                gConfig["version"] = version
+                if len(versionSplit) != len(currentVersionSplit):
+                    _autoUpdate()
+                    break
+                for i in range(len(versionSplit)):
+                    if int(versionSplit[i]) > int(currentVersionSplit[i]):
+                        _autoUpdate()
+                        break
+                    elif int(versionSplit[i]) < int(currentVersionSplit[i]):
+                        break
+                break
+        _saveGolbalConfig(gConfig)
+    if not os.path.exists(M_AIRONE_SYS_BIN):
+        _autoUpdate()
+
+#endregion
+
+# region [main] boxapp
+# *********************************
+#    boxapp
+# *********************************
+
+class TaroThread(Thread):
+    cmd = ''
+    def __init__(self, cmd):
+        Thread.__init__(self)
+        self.cmd = cmd
+    def run(self):
+        os.system(self.cmd)
+
+class WatchHandler(FileSystemEventHandler):
+    distPath = ''
+    def __init__(self, distPath):
+        self.distPath = distPath
+    def on_modified(self, event):
+        print("Src is changed and syncing now.")
+        if os.path.isdir(self.distPath):
+            shutil.rmtree(self.distPath)
+        shutil.copytree('./app', self.distPath)
+    def on_created(self, event):
+        print("Src is changed and syncing now.")
+        if os.path.isdir(self.distPath):
+            shutil.rmtree(self.distPath)
+        shutil.copytree('./app', self.distPath)
+
+
+def boxappEntry(args):
+    global gDebug
+    if len(args) < 1 or len(args) > 2:
+        boxUsage()
+    appType = args[0]
+    if len(args) > 1:
+        if args[1] == '-d':
+            gDebug = True
+        else:
+            print('Wrong options')
+            boxUsage()
+    if appType == 'baidu':
+        boxappBaidu(gDebug)
+    else:
+        print(appType + ' not support!')
+
+def boxappBaidu(debugEnable):
+    if not debugEnable:
+        os.system('taro build --type swan')
+    else:
+        t = TaroThread('cd boxapp-core;taro build --type swan --watch')
+        t.start()
+        time.sleep(5)
+        watchSrcChangeAndSync('./boxapp-core/src/app')
+
+
+def watchSrcChangeAndSync(dist):
+    _spinloading(True, 'Watching src')
+    event_handler = WatchHandler(dist)
+    observer = Observer()
+    observer.schedule(event_handler, './app', recursive=True)
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        _spinloading(False)
+        observer.stop()
+
+# endregion
+
+
+# region [main] cli
 # *********************************
 #    Cli methods
 # *********************************
+
+class LoadingThread(Thread):
+    def run(self):
+        global gLoadingStop
+        while not gLoadingStop:
+            print('.', end = '', flush = True)
+            time.sleep(0.3)
+        print('success', flush = True)
+
+class SpinThread(Thread):
+    msg = ''
+    interval = 1
+    def __init__(self, msg='', interval = 1):
+        Thread.__init__(self)
+        self.msg = msg
+        self.interval = interval
+    def run(self):
+        global gLoadingStop
+        while not gLoadingStop:
+            for i in range(4):
+                print(self.msg + '.' * i + ' ' *  (4-i), end = '\r', flush = True)
+                time.sleep(self.interval)
+        print(self.msg + '...stop', end = ' ', flush = True)
+
+def _spinloading(showLoading=True, msg='', interval=1):
+    global gLoadingStop
+    if showLoading and gLoadingStop == True:
+        gLoadingStop = False
+        t = SpinThread('  ' + msg, interval)
+        t.start()
+    else:
+        gLoadingStop = True
+
+def _loading(showLoading=True, msg=''):
+    global gLoadingStop
+    if showLoading and gLoadingStop == True:
+        gLoadingStop = False
+        print(msg, end = '')
+        t = LoadingThread()
+        t.start()
+    else:
+        gLoadingStop = True
 
 def _exit(msg=None):
     if msg != None:
@@ -352,14 +539,15 @@ def _parseArgv():
     """
     pass the cmd & options of the command
     """
+    global gDebug
     if len(sys.argv) <= 1:
         usage()
         sys.exit(0)
     try:
         cmd = _parseCmd(sys.argv[1], [
-            "update", "new", 'install'
+            "update", "new", 'install', 'boxapp'
         ])
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version"])
+        opts, args = getopt.getopt(sys.argv[1:], "hvd", ["help", "version"])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
@@ -371,6 +559,8 @@ def _parseArgv():
                 newEntry(sys.argv[2:])
             if cmd == 'install':
                 installEntry()
+            if cmd == 'boxapp':
+                boxappEntry(sys.argv[2:])
         else:
             if not opts:
                 usage()
@@ -379,6 +569,9 @@ def _parseArgv():
                     usage()
                 if o in ("-v", "--version"):
                     print(__version__)
+                    return
+                if o in ('-d', '--debug'):
+                    gDebug = True
                     return
     except ValueError as err:
         print(str(err))
@@ -401,3 +594,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# endregion
