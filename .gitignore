@@ -6,4 +6,5 @@ test.js
 yarn.lock
 yarn-error.log
 build/
+dist/
 package-lock.json
