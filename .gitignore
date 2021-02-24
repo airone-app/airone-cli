@@ -1,0 +1,9 @@
+npm-debug.*
+node_modules/
+test.js
+.idea
+.vscode
+yarn.lock
+yarn-error.log
+build/
+package-lock.json
