@@ -1,6 +1,7 @@
 # airone-cli `[latest version: v1.0.0]`
 
 > airone cli -- an amazing tool to generate hybrid modularized app or related module with one-key. 
+>
 > airone -- 一键生成跨平台模块化app神器
 
 ```
