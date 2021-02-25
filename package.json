@@ -1,7 +1,7 @@
 {
   "name": "airone",
   "version": "1.0.0",
-  "description": "airone cli, an amazing tool to generate hybrid modularized app or related module with one-key. \nairone 一键生成跨平台模块化app神器",
+  "description": "airone cli -- an amazing tool to generate hybrid modularized app or related module with one-key. \nairone -- 一键生成跨平台模块化app神器",
   "main": "dist/index.js",
   "scripts": {
     "build": "rollup -c",
@@ -10,7 +10,8 @@
     "pretest": "npm run build"
   },
   "bin": {
-    "airone": "dist/index.js"
+    "airone": "dist/index.js",
+    "airone-install": "dist/index-install.js"
   },
   "author": "luochenxun (luochenxun@gmail.com)",
   "license": "ISC",

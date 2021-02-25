@@ -13,7 +13,7 @@ const globals = external.reduce((prev, current) => {
   return newPrev
 }, {})
 
-const defaultConfig = {
+const defaultConfig = [{
   input: './src/index.ts',
   output: {
     file: './dist/index.js',
@@ -32,6 +32,25 @@ const defaultConfig = {
     json(),
     terser()
   ]
-}
+},{
+  input: './src/index-install.ts',
+  output: {
+    file: './dist/index-install.js',
+    format: 'cjs',
+    banner: '#!/usr/bin/env node',
+    globals
+  },
+  external,
+  plugins: [
+    typescript2({
+      exclude: 'node_modules/**',
+      useTsconfigDeclarationDir: true,
+      typescript,
+      tsconfig: './tsconfig.json'
+    }),
+    json(),
+    terser()
+  ]
+}]
 
 export default defaultConfig
