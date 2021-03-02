@@ -368,7 +368,7 @@ program
   .command('upgrade')
   .description('脚本自动升级')
   .action(() => {
-    checkAndAutoUpgrade()
+    checkAndAutoUpgrade(true)
   })
 
 //#endregion
