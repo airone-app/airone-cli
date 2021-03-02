@@ -99,7 +99,6 @@ program.addHelpText('after', `
 //#endregion
 
 
-
 //#region [scaffold] 脚手架方法
 
 const timeConsumingCmd = (cmd: string, tips: string = '处理中，请稍候'): Promise<{ code: number, stdout: string, stderr: string }> => {
@@ -271,6 +270,25 @@ async function updateModules (modules: Array<AironeModule>, dir: string) {
   // 判断目录是否存在
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir)
+  } else {
+    const prompt = [
+      {
+        type: 'confirm',
+        name: 'value',
+        default: false,
+        message: `install 命令将清空 ${dir.substring(dir.lastIndexOf('/'))} 目录，请事先将保存您所有改动，是否继续?`
+      }
+    ]
+
+    // AironeConfig
+    const { value } = await inquirer.prompt(prompt);
+    if (value == false) {
+      shelljs.echo('用户取消操作！');
+      shelljs.exit(-1)
+    } else {
+      shelljs.rm('-rf', dir);
+      fs.mkdirSync(dir)
+    }
   }
 
   // 遍历模块并下载之
