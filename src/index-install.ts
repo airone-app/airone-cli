@@ -259,6 +259,7 @@ async function downloadModule (module: AironeModule, dir: string) {
 
 /** 更新单个模块 */
 const updateModule = (module: AironeModule, dir: string) => {
+  //TODO: 模块更新功能
 }
 
 /** 更新多个模块 */
@@ -316,7 +317,7 @@ async function rewritePodfile (config: AironeConfig) {
   for (const module of config.modules) {
     modules.push(`    pod '${module.name}', :path => '../modules/${module.name}'`)
   }
-  podFileLines.splice(aironeStart + 1, airEnd - aironeStart, ...modules)
+  podFileLines.splice(aironeStart + 1, airEnd - aironeStart - 1 , ...modules)
   aironeStart += modules.length
 
   // insert the devModules infos
@@ -325,7 +326,7 @@ async function rewritePodfile (config: AironeConfig) {
   for (const module of config.devModules) {
     devModules.push(`    pod '${module.name}', :path => '../devModules/${module.name}'`)
   }
-  devModules.push('end') // end
+  devModules.push('end\n') // end
   podFileLines.splice(aironeStart + 1, 0, ...devModules)
   aironeStart += devModules.length
 
