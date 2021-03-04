@@ -131,17 +131,16 @@ function convertDir(dir: string, map: any) {
   var lsResult = fs.readdirSync(dir);
   lsResult.forEach(function (element, index) {
     const elementPath = path.join(dir, element)
-    var info = fs.statSync(elementPath)
     // 文件名或目录名替换
-    let convertPath = elementPath
     Object.keys(map).forEach((key) => {
-      convertPath = elementPath.replace(key, map[key])
+      element = element.replace(key, map[key])
     })
+    let convertPath = path.join(dir, element)
     // 目录名替换
     if (convertPath != elementPath) {
       shelljs.mv(elementPath, convertPath)
     }
-    if (info.isDirectory()) { // 递归遍历目录
+    if (fs.statSync(convertPath).isDirectory()) { // 递归遍历目录
       convertDir(convertPath, map)
     } else {
       Object.keys(map).forEach((key) => {
