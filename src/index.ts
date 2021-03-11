@@ -357,6 +357,10 @@ const saveConfig = (config: Config, configPath?: string): void => {
 program
   .command('install [module]', 'install one or more air-module （安装air模块）').alias('i')
 
+
+program
+  .command('dev', 'airone 开发便利工具')
+
 //#endregion
 
 

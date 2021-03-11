@@ -51,6 +51,25 @@ const defaultConfig = [{
     json(),
     terser()
   ]
+},{
+  input: './src/index-dev.ts',
+  output: {
+    file: './dist/index-dev.js',
+    format: 'cjs',
+    banner: '#!/usr/bin/env node',
+    globals
+  },
+  external,
+  plugins: [
+    typescript2({
+      exclude: 'node_modules/**',
+      useTsconfigDeclarationDir: true,
+      typescript,
+      tsconfig: './tsconfig.json'
+    }),
+    json(),
+    terser()
+  ]
 }]
 
 export default defaultConfig
