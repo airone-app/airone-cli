@@ -144,7 +144,8 @@ function convertDir(dir: string, map: any) {
       convertDir(convertPath, map)
     } else {
       Object.keys(map).forEach((key) => {
-        shelljs.sed('-i', key, map[key], convertPath);
+        const reg = new RegExp(key, 'g');
+        shelljs.sed('-i', reg, map[key], convertPath);
       })
     }
   })
