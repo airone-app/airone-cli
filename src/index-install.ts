@@ -303,6 +303,13 @@ async function updateModules (modules: Array<AironeModule>, dir: string) {
   }
 }
 
+async function installReactNativeSupport(dir: string) {
+  shelljs.cd(dir)
+  if (fs.existsSync(path.join(dir, './tools/devTool.py'))) {
+    await timeConsumingCmd(`./tools/devTool.py -u 1>&- 2>&-`, '正在安装 React Native 依赖，耗时操作，请耐心等候（大约 2 min）')
+  }
+}
+
 //#endregion
 
 
@@ -455,6 +462,7 @@ async function main () {
   const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
   await updateModules(projectConfig.modules, path.join(PROJECT_DIR, 'modules'))
   await updateModules(projectConfig.devModules, path.join(PROJECT_DIR, 'devModules'))
+  await installReactNativeSupport(path.join(PROJECT_DIR, 'rn'))
   await iosProjectProcess(projectConfig)
 }
 
