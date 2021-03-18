@@ -356,7 +356,10 @@ const saveConfig = (config: Config, configPath?: string): void => {
 //#region [sub] command - 导入外部命令
 
 program
-  .command('install [module]', 'install one or more air-module （安装air模块）').alias('i')
+  .command('install [module]', 'install one or more air-module （安装air模块，如已安装模块，将进行覆盖）').alias('i')
+
+program
+  .command('update [module]', 'update one or all air-modules （更新air模块，只更新当前所有模块或指定某个模块，不会对修改进行覆盖）').alias('u')
 
 
 program

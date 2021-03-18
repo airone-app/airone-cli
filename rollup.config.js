@@ -52,6 +52,25 @@ const defaultConfig = [{
     terser()
   ]
 },{
+  input: './src/index-update.ts',
+  output: {
+    file: './dist/index-update.js',
+    format: 'cjs',
+    banner: '#!/usr/bin/env node',
+    globals
+  },
+  external,
+  plugins: [
+    typescript2({
+      exclude: 'node_modules/**',
+      useTsconfigDeclarationDir: true,
+      typescript,
+      tsconfig: './tsconfig.json'
+    }),
+    json(),
+    terser()
+  ]
+},{
   input: './src/index-dev.ts',
   output: {
     file: './dist/index-dev.js',

@@ -364,7 +364,7 @@ const updateModule = (module: AironeModule, dir: string) => {
 }
 
 /** 更新多个模块 */
-async function updateModules(modules: Array<AironeModule>, dir: string) {
+async function updateModules_bk(modules: Array<AironeModule>, dir: string) {
   if (modules == null || modules.length == 0) {
     return;
   }
@@ -378,7 +378,7 @@ async function updateModules(modules: Array<AironeModule>, dir: string) {
         type: 'confirm',
         name: 'value',
         default: false,
-        message: `install 命令将清空 ${dir.substring(dir.lastIndexOf('/'))} 目录，请事先将保存您所有改动，是否继续?`
+        message: `install 命令将清空 ${dir.substring(dir.lastIndexOf('/') + 1)} 目录，请事先将保存您所有改动，是否继续?`
       }
     ]
 
@@ -587,6 +587,106 @@ async function installPods() {
 //#endregion
 
 
+//#region [main]  更新 modules
+
+const outputOverAll: string[] = []
+function updateModules(dirPath: string) {
+  if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+    return;
+  }
+
+  var lsResult = fs.readdirSync(dirPath);
+
+  outputOverAll.splice(0, outputOverAll.length);
+  outputOverAll.push('\n\n')
+  outputOverAll.push('------------- 结果汇总 ------------')
+
+  for (let index = 0; index < lsResult.length; index++) {
+    const element = lsResult[index];
+    const elementPath = path.join(dirPath, element)
+    if (fs.statSync(elementPath).isDirectory()) {
+      if (!fs.existsSync(path.join(elementPath, './.git'))) {
+        continue;
+      }
+      shelljs.cd(elementPath)
+      // 1. 先检查此目录是否有修改
+      if(!checkProjModify(elementPath)) { // 有修改
+        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有改动还未提交，请先提交之.`
+        outputOverAll.push(msg)
+        shelljs.echo(msg)
+      }
+      // 2. 更新当前目录
+      else if(!checkProjPull(elementPath)) { // 有修改
+        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有冲突, 需要手动更新.`
+        outputOverAll.push(msg)
+        shelljs.echo(msg)
+      }
+      else {
+        outputOverAll.push(`√ ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 更新成功！`)
+      }
+
+      // 即出目录
+      shelljs.cd('..')
+    }
+  }
+
+  shelljs.echo(outputOverAll.join('\n'))
+}
+
+function checkProjModify(checkPath: string): boolean {
+  shelljs.echo('-------------------------')
+  shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}，检查是否有改动未提交...`)
+
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  const result = shelljs.exec('git status', {silent: true})
+  const resultList = result.toString().split('\n')
+  if (resultList.length > 0) {
+    const lastLine = resultList[resultList.length - 1]
+    const lastLine2 = resultList[resultList.length - 2]
+    if (lastLine.indexOf('nothing to commit') != -1) {
+      shelljs.echo(`clean ！`)
+      return true;
+    } else if  (lastLine2.indexOf('nothing to commit') != -1) {
+      shelljs.echo(`clean ！`)
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function checkProjPull(checkPath: string): boolean {
+  shelljs.echo('-n', `* 正在更新目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
+
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  const result = shelljs.exec('git pull --rebase', {silent: true})
+  const resultList = result.toString().split('\n')
+  if (resultList.length > 0) {
+    const lastLine = resultList[resultList.length - 1]
+    const lastLine2 = resultList[resultList.length - 2]
+    if (lastLine.indexOf('Current branch master is up to date') != -1) {
+      shelljs.echo(` 更新成功 ！`)
+      return true;
+    } else if  (lastLine2.indexOf('Current branch master is up to date') != -1) {
+      shelljs.echo(` 更新成功 ！`)
+      return true;
+    }
+  }
+
+  return false;
+}
+
+//#endregion
 
 //#region [interface]  命令行定义及处理参数
 
@@ -612,18 +712,15 @@ async function main() {
   let modulesDir = path.join(PROJECT_DIR, 'modules')
   let devModulesDir = path.join(PROJECT_DIR, 'devModules')
 
+
   const options = program.opts();
 
   const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
   if (StringUtil.isEmpty(ModuleName)) { // 全局安装
-    await updateModules(projectConfig.modules, path.join(PROJECT_DIR, 'modules'))
-    await updateModules(projectConfig.devModules, path.join(PROJECT_DIR, 'devModules'))
-    await installReactNativeSupport(path.join(PROJECT_DIR, 'rn'))
-    await iosProjectProcess(projectConfig)
+    updateModules(modulesDir)
+    updateModules(devModulesDir)
   } else {
-    const [dir, module] = await updateAironeJson(ModuleName as string)
-    await addModule(module, dir)
-    await iosProjectProcess(projectConfig)
+    //TODO: 更新单个模块: ModuleName
   }
 
 }
