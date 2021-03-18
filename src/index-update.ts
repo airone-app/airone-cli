@@ -590,17 +590,50 @@ async function installPods() {
 //#region [main]  更新 modules
 
 const outputOverAll: string[] = []
-function updateModules(dirPath: string) {
+async function updateModules(dirPath: string) {
   if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
     return;
   }
 
   var lsResult = fs.readdirSync(dirPath);
+  const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
+
+  // 检查是否有模块没下载
+  if (dirPath.indexOf('devModules') != -1) { // devModules
+    // 1. 多余目录删除之
+    for (let index = 0; index < lsResult.length; index++) {
+      const element = lsResult[index];
+      const elementPath = path.join(dirPath, element)
+      let foundElement = false;
+      for (const airModule of projectConfig.devModules) {
+        if (airModule.name == element) {
+          foundElement = true;
+        }
+      }
+      if (foundElement == false) {
+        console.log('找到废弃模块并删除之 ==>', element);
+        shelljs.rm('-rf', elementPath)
+      }
+    }
+    // 2. 新模块下载之
+    for (const airModule of projectConfig.devModules) {
+      let foundElement = false;
+      for (let index = 0; index < lsResult.length; index++) {
+        const element = lsResult[index];
+        const elementPath = path.join(dirPath, element)
+        if (airModule.name == element) {
+          foundElement = true;
+        }
+      }
+      if (foundElement == false) {
+        await downloadModule(airModule, path.join(dirPath, airModule.name));
+      }
+    }
+  }
 
   outputOverAll.splice(0, outputOverAll.length);
   outputOverAll.push('\n\n')
   outputOverAll.push('------------- 结果汇总 ------------')
-
   for (let index = 0; index < lsResult.length; index++) {
     const element = lsResult[index];
     const elementPath = path.join(dirPath, element)
@@ -717,8 +750,8 @@ async function main() {
 
   const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
   if (StringUtil.isEmpty(ModuleName)) { // 全局安装
-    updateModules(modulesDir)
-    updateModules(devModulesDir)
+    await updateModules(modulesDir)
+    await updateModules(devModulesDir)
   } else {
     //TODO: 更新单个模块: ModuleName
   }
