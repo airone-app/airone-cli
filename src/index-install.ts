@@ -79,9 +79,9 @@ interface Config {
 
 // 版本信息
 program.addHelpText('before', `
-安装 air 模块命令。
-1. 直接运行(不带参数):  ${pkg.name} install 根据工程目录 airone.json 安装配置中的所有依赖模块。
-2. 安装指定 air 模块:  ${pkg.name} install xx，安装指定的 air 模块，安装成功后会更新 airone.json。
+install airone modules
+1. ${pkg.name} install :  Install all the dependency module base on the airone.json.
+2. ${pkg.name} install ModuleName:  Install specific module of given name, and it'll update the airone.json after success.
 `);
 
 // 版本号
@@ -94,7 +94,7 @@ program.addHelpText('before', `
 
 // 使用示例
 program.addHelpText('after', `
-运行 ${pkg.name} install -h | --help 查看命令使用。
+Run ${pkg.name} install -h | --help for more help。
 `);
 
 program

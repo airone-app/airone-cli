@@ -69,10 +69,10 @@ interface Config {
 //#region [main]          命令行基本信息
 
 // 版本信息
-program.addHelpText('before', `${pkg.description} \nversion: ${pkg.version}`);
+program.addHelpText('before', `${pkg.description} \n\nversion: ${pkg.version}`);
 
 // 版本号
-program.version(pkg.version, '-v, --version', 'output the current version （查看当前版本号）');
+program.version(pkg.version, '-v, --version', 'Print the current version');
 
 // 作者
 
@@ -81,8 +81,8 @@ program.version(pkg.version, '-v, --version', 'output the current version （查
 
 // 使用示例
 program.addHelpText('after', `
-运行 ${pkg.name} -h | --help 查看命令使用。
-也可使用如 ${pkg.name} install -h 查看单个命令的帮助
+run "${pkg.name} -h | --help" for help.
+You can also use "${pkg.name} command -h" to check the specific command such as "${pkg.name} install -h".
 `);
 
 //#endregion
@@ -356,14 +356,14 @@ const saveConfig = (config: Config, configPath?: string): void => {
 //#region [sub] command - 导入外部命令
 
 program
-  .command('install [module]', 'install one or more air-module （安装air模块，如已安装模块，将进行覆盖）').alias('i')
+  .command('install [module]', 'Install one or more air-module (this operation will rewrite the exist module)').alias('i')
 
 program
-  .command('update [module]', 'update one or all air-modules （更新air模块，只更新当前所有模块或指定某个模块，不会对修改进行覆盖）').alias('u')
+  .command('update [module]', 'update one or all air-modules （only update the exist module and will show tips of modified module）').alias('u')
 
 
 program
-  .command('dev', 'airone 开发便利工具')
+  .command('dev', 'airone develop tools')
 
 //#endregion
 
@@ -373,7 +373,7 @@ program
 
 program
   .command('upgrade')
-  .description('脚本自动升级')
+  .description('auto check and update')
   .action(() => {
     checkAndAutoUpgrade(true)
   })
@@ -385,7 +385,7 @@ program
 
 program
   .command('init')
-  .description('初始化 airone 项目')
+  .description('Initialize an airone project')
   .action(() => {
     initProject()
   })
