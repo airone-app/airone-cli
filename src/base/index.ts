@@ -14,6 +14,7 @@
 
 export { default as NumberUtil } from './ext/numberUtil'
 export { default as UrlUtil } from './ext/urlUtil'
+export { default as ArrayUtil } from './ext/arrayUtil'
 export { default as ObjectUtil } from './ext/objectUtil'
 export { default as StringUtil } from './ext/stringUtil'
 export { default as FileUtil } from './ext/fileUtil'

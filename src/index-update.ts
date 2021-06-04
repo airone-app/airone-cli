@@ -17,7 +17,7 @@ import OraJS from 'ora'
 import * as inquirer from 'inquirer'
 import pkg from '../package.json'
 // framework
-import { DateUtil, StringUtil } from './base'
+import { DateUtil, StringUtil, ArrayUtil } from './base'
 
 
 //#region [define]   全局定义
@@ -363,48 +363,6 @@ const updateModule = (module: AironeModule, dir: string) => {
   //TODO: 模块更新功能
 }
 
-/** 更新多个模块 */
-async function updateModules_bk(modules: Array<AironeModule>, dir: string) {
-  if (modules == null || modules.length == 0) {
-    return;
-  }
-
-  // 判断目录是否存在
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir)
-  } else {
-    const prompt = [
-      {
-        type: 'confirm',
-        name: 'value',
-        default: false,
-        message: `install 命令将清空 ${dir.substring(dir.lastIndexOf('/') + 1)} 目录，请事先将保存您所有改动，是否继续?`
-      }
-    ]
-
-    // AironeConfig
-    const { value } = await inquirer.prompt(prompt);
-    if (value == false) {
-      shelljs.echo('用户取消操作！');
-      shelljs.exit(-1)
-    } else {
-      shelljs.rm('-rf', dir);
-      fs.mkdirSync(dir)
-    }
-  }
-
-  // 遍历模块并下载之
-  for (const module of modules) {
-    // 先判断模块是否存在，若存在，需要走模块更新逻辑
-    const moduleDir = path.join(dir, module.name)
-    if (fs.existsSync(moduleDir)) {
-      updateModule(module, moduleDir)
-    } else {
-      await downloadModule(module, moduleDir)
-    }
-  }
-}
-
 async function addModule(module: AironeModule, dir: string) {
   if (module == null || StringUtil.isEmpty(module.git)) {
     return;
@@ -595,7 +553,7 @@ async function updateModules(dirPath: string) {
     return;
   }
 
-  var lsResult = fs.readdirSync(dirPath);
+  var lsResult: string[] = fs.readdirSync(dirPath);
   const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
 
   // 检查是否有模块没下载
@@ -613,6 +571,7 @@ async function updateModules(dirPath: string) {
       if (foundElement == false) {
         console.log('找到废弃模块并删除之 ==>', element);
         shelljs.rm('-rf', elementPath)
+        ArrayUtil.remove(lsResult, element)
       }
     }
     // 2. 新模块下载之
@@ -643,13 +602,19 @@ async function updateModules(dirPath: string) {
       }
       shelljs.cd(elementPath)
       // 1. 先检查此目录是否有修改
-      if(!checkProjModify(elementPath)) { // 有修改
+      if (!checkProjModify(elementPath)) { // 有修改
         const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有改动还未提交，请先提交之.`
         outputOverAll.push(msg)
         shelljs.echo(msg)
       }
+      // 3. 更新 branch or tag
+      else if (!checkProjBranchAndTag(elementPath, element, projectConfig.devModules)) { // 有修改
+        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 切分支或Tag时报错，请自行检查 `
+        outputOverAll.push(msg)
+        shelljs.echo(msg)
+      }
       // 2. 更新当前目录
-      else if(!checkProjPull(elementPath)) { // 有修改
+      else if (!checkProjPull(elementPath)) { // 有修改
         const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有冲突, 需要手动更新.`
         outputOverAll.push(msg)
         shelljs.echo(msg)
@@ -666,6 +631,54 @@ async function updateModules(dirPath: string) {
   shelljs.echo(outputOverAll.join('\n'))
 }
 
+function checkProjBranchAndTag(checkPath: string, element: string, modules: AironeModule[]): boolean {
+  shelljs.echo('-n', `* 检查分支与Tag： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
+
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  // 取之 airModule
+  let airModule: AironeModule | null = null
+  for (const module of modules) {
+    if (module.name == element) {
+      airModule = module
+      break;
+    }
+  }
+
+  if (airModule && airModule.branch) {
+    shelljs.exec('git checkout ' + airModule.branch, { silent: true })
+    const result = shelljs.exec('echo $?', { silent: true })
+    shelljs.echo(` 结果 ${result == '0'} `)
+    if (result == '0') {
+      return true
+    } else {
+      return false;
+    }
+  }
+  else if (airModule && airModule.tag) {
+    shelljs.exec(`git checkout -b ${airModule.tag} ${airModule.tag}`, { silent: true })
+    const result = shelljs.exec('echo $?', { silent: true }).trim()
+    if (result == '0') {
+      return true
+    } else { // 建 Tag 失败，则
+      shelljs.exec(`git checkout ${airModule.tag}`)
+      const result2 = shelljs.exec('echo $?').trim()
+      shelljs.echo(` 结果 ${result2} `)
+      if (result2 == '0') {
+        return true
+      } else { // 切 Tag 失败，报错之
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function checkProjModify(checkPath: string): boolean {
   shelljs.echo('-------------------------')
   shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}，检查是否有改动未提交...`)
@@ -676,7 +689,7 @@ function checkProjModify(checkPath: string): boolean {
     shelljs.exit(1);
   }
 
-  const result = shelljs.exec('git status', {silent: true})
+  const result = shelljs.exec('git status', { silent: true })
   const resultList = result.toString().split('\n')
   if (resultList.length > 0) {
     const lastLine = resultList[resultList.length - 1]
@@ -684,7 +697,7 @@ function checkProjModify(checkPath: string): boolean {
     if (lastLine.indexOf('nothing to commit') != -1) {
       shelljs.echo(`clean ！`)
       return true;
-    } else if  (lastLine2.indexOf('nothing to commit') != -1) {
+    } else if (lastLine2.indexOf('nothing to commit') != -1) {
       shelljs.echo(`clean ！`)
       return true;
     }
@@ -702,7 +715,7 @@ function checkProjPull(checkPath: string): boolean {
     shelljs.exit(1);
   }
 
-  const result = shelljs.exec('git pull --rebase', {silent: true})
+  const result = shelljs.exec('git pull --rebase', { silent: true })
   const resultList = result.toString().split('\n')
   if (resultList.length > 0) {
     const lastLine = resultList[resultList.length - 1]
@@ -710,7 +723,7 @@ function checkProjPull(checkPath: string): boolean {
     if (lastLine.indexOf('Current branch master is up to date') != -1) {
       shelljs.echo(` 更新成功 ！`)
       return true;
-    } else if  (lastLine2.indexOf('Current branch master is up to date') != -1) {
+    } else if (lastLine2.indexOf('Current branch master is up to date') != -1) {
       shelljs.echo(` 更新成功 ！`)
       return true;
     }
