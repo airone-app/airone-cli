@@ -607,13 +607,13 @@ async function updateModules(dirPath: string) {
         outputOverAll.push(msg)
         shelljs.echo(msg)
       }
-      // 3. 更新 branch or tag
+      // 2. 更新 branch or tag
       else if (!checkProjBranchAndTag(elementPath, element, projectConfig.devModules)) { // 有修改
         const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 切分支或Tag时报错，请自行检查 `
         outputOverAll.push(msg)
         shelljs.echo(msg)
       }
-      // 2. 更新当前目录
+      // 3. 更新当前目录
       else if (!checkProjPull(elementPath)) { // 有修改
         const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有冲突, 需要手动更新.`
         outputOverAll.push(msg)
@@ -651,7 +651,7 @@ function checkProjBranchAndTag(checkPath: string, element: string, modules: Airo
 
   if (airModule && airModule.branch) {
     shelljs.exec('git checkout ' + airModule.branch, { silent: true })
-    const result = shelljs.exec('echo $?', { silent: true })
+    const result = shelljs.exec('echo $?', { silent: true }).trim()
     shelljs.echo(` 结果 ${result == '0'} `)
     if (result == '0') {
       return true
@@ -720,10 +720,10 @@ function checkProjPull(checkPath: string): boolean {
   if (resultList.length > 0) {
     const lastLine = resultList[resultList.length - 1]
     const lastLine2 = resultList[resultList.length - 2]
-    if (lastLine.indexOf('Current branch master is up to date') != -1) {
+    if (lastLine.indexOf('is up to date') != -1) {
       shelljs.echo(` 更新成功 ！`)
       return true;
-    } else if (lastLine2.indexOf('Current branch master is up to date') != -1) {
+    } else if (lastLine2.indexOf('is up to date') != -1) {
       shelljs.echo(` 更新成功 ！`)
       return true;
     }
