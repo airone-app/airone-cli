@@ -720,10 +720,12 @@ function checkProjPull(checkPath: string): boolean {
   if (resultList.length > 0) {
     const lastLine = resultList[resultList.length - 1]
     const lastLine2 = resultList[resultList.length - 2]
-    if (lastLine.indexOf('is up to date') != -1) {
+    if (lastLine.toLowerCase().indexOf('is up to date') != -1
+          || lastLine.toLowerCase().indexOf('already up to date') != -1) {
       shelljs.echo(` 更新成功 ！`)
       return true;
-    } else if (lastLine2.indexOf('is up to date') != -1) {
+    } else if (lastLine2.toLowerCase().indexOf('is up to date') != -1
+                || lastLine2.toLowerCase().indexOf('already up to date') != -1) {
       shelljs.echo(` 更新成功 ！`)
       return true;
     }
