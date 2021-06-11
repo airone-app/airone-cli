@@ -579,11 +579,11 @@ async function updateModules(dirPath: string) {
               type: 'confirm',
               name: 'value',
               default: true,
-              message: `找到一个目录 "${element}" 不在 airone.json 中，是否删除之?`
+              message: `找到一个目录 "${element}" 不在 airone.json 中，是否忽略之?`
             }
           ]
           const { value } = await inquirer.prompt(prompt);
-          if (value == false) {
+          if (value) {
             continue
           }
         } else {
