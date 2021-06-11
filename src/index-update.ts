@@ -103,6 +103,8 @@ program
     ModuleName = op
   })
 
+program
+  .option('-f, --force', 'force update, this option will remove the files that not exist in airone.json');
 //#endregion
 
 
@@ -569,7 +571,24 @@ async function updateModules(dirPath: string) {
         }
       }
       if (foundElement == false) {
-        console.log('找到废弃模块并删除之 ==>', element);
+        // 判断是否强制删除非项目配置文件，默认非强制，会询问用户
+        const isForceMode = program.opts().force
+        if (!isForceMode) {
+          const prompt = [
+            {
+              type: 'confirm',
+              name: 'value',
+              default: true,
+              message: `找到一个目录 "${element}" 不在 airone.json 中，是否删除之?`
+            }
+          ]
+          const { value } = await inquirer.prompt(prompt);
+          if (value == false) {
+            continue
+          }
+        } else {
+          shelljs.echo(`删除非 airone.json 中配置的模块： "${element}" `)
+        }
         shelljs.rm('-rf', elementPath)
         ArrayUtil.remove(lsResult, element)
       }
@@ -735,6 +754,7 @@ function checkProjPull(checkPath: string): boolean {
 }
 
 //#endregion
+
 
 //#region [interface]  命令行定义及处理参数
 
