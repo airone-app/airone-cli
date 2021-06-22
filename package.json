@@ -1,7 +1,7 @@
 {
   "name": "airone",
-  "version": "1.1.4",
-  "description": "airone cli -- an amazing tool to generate hybrid modularized app or related module with one-key. \nairone -- 一键生成跨平台模块化app神器",
+  "version": "1.1.5",
+  "description": "airone cli -- an amazing tool to generate hybrid modularized app or related module with one key. \n",
   "main": "dist/index.js",
   "scripts": {
     "build": "rollup -c",

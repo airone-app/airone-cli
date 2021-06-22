@@ -33,6 +33,7 @@ let PROJECT_DIR = shelljs.pwd().toString()
 let PROJECT_CONFIG_PATH = path.join(PROJECT_DIR, 'airone.json')
 const ERROR_MSG = `${pkg.name} 更新失败，请重试或手动更新`;
 const ROOT_TEMPLATE = 'http://git.jyblife.com/airone/root-templete.git';
+const MODULE_TEMPLATE = 'https://github.com/airone-app/module-templete.git'
 
 // 新建 program 对象，全局命令行对象
 const program = new Command(pkg.name)
@@ -69,7 +70,7 @@ interface Config {
 //#region [main]          命令行基本信息
 
 // 版本信息
-program.addHelpText('before', `${pkg.description} \n\nversion: ${pkg.version}`);
+program.addHelpText('before', `${pkg.description}latest version: ${pkg.version}\n`);
 
 // 版本号
 program.version(pkg.version, '-v, --version', 'Print the current version');
@@ -90,8 +91,8 @@ You can also use "${pkg.name} command -h" to check the specific command such as 
 
 //#region [main]          主要方法
 
-const readMap = async () => {
-  const mapPath = path.join(PROJECT_DIR, 'map.json')
+const readMap = async (mapFileDir: string = PROJECT_DIR, defaultMap: any = {}) => {
+  const mapPath = path.join(mapFileDir, 'map.json')
   let originMap: any = {}
   let map: any = {}
   if (fs.existsSync(mapPath)) {
@@ -100,6 +101,11 @@ const readMap = async () => {
   }
 
   for (const key of Object.keys(originMap)) {
+    if (key in defaultMap) {
+      map[key] = defaultMap[key]
+      continue
+    }
+
     const prompt = [
       {
         type: 'input',
@@ -214,6 +220,61 @@ async function initProject() {
   await createAironeJson(projectName, projectDesc, projectVersion)
 
   console.log('项目初始化成功，配置文件在：' + PROJECT_CONFIG_PATH);
+}
+
+/**
+ * new 命令 - 新建一个模块或其它（后面可扩展）
+ */
+async function newCommand() {
+  // 用户选择要新建的项目
+  const option = await selectNewOption()
+  if (option == 'module') {
+    await newModule()
+  }
+}
+
+async function selectNewOption() {
+  const prompt = [
+    {
+      type: 'list',
+      name: 'option',
+      default: 'module',
+      message: `请选择您想新建什么项目`,
+      choices: [
+        { name: "module (airone 模块)", value: "module" },
+      ],
+    }
+  ]
+  // AironeConfig
+  const { option } = await inquirer.prompt(prompt);
+  return option
+}
+
+async function newModule() {
+  const prompt = [
+    {
+      type: 'input',
+      name: 'projectName',
+      message: '模块名(请使用英文，如：AirBase)：',
+      validate: (value: string) => value.length > 0 || '项目名不能为空'
+    }
+  ]
+  const { projectName } = await inquirer.prompt(prompt);
+
+  // 拉取模板工程
+  if ((await timeConsumingCmd(`git clone ${MODULE_TEMPLATE} ${projectName} 1>&- 2>&-`, '正在拉取模块工程')).code !== 0) {
+    shelljs.echo('拉取模块项目失败');
+    return;
+  }
+
+  // 壳工程文本替换
+  const map = await readMap(projectName, { 'AAAA': projectName })
+  spinner.start('生成iOS项目中，请稍等...');
+  shelljs.rm('-rf', path.join(projectName, '.git'))
+  convertDir(projectName, map)
+  spinner.stop()
+
+  shelljs.echo('项目已生成，请自行进入模块开发及代码提交，祝您开发顺利，全年无bug~ (如在主项目中创建，注意将module添加入airone.json)')
 }
 
 //#endregion
@@ -390,6 +451,12 @@ program
     initProject()
   })
 
+program
+  .command('new')
+  .description('Generate an airone new module or plugin')
+  .action(() => {
+    newCommand()
+  })
 //#endregion
 
 
