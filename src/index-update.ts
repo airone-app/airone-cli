@@ -17,7 +17,7 @@ import OraJS from 'ora'
 import * as inquirer from 'inquirer'
 import pkg from '../package.json'
 // framework
-import { DateUtil, StringUtil, ArrayUtil } from './base'
+import { DateUtil, StringUtil, ArrayUtil, SystemUtil } from './base'
 
 
 //#region [define]   全局定义
@@ -634,7 +634,7 @@ async function updateModules(dirPath: string) {
       }
       // 3. 更新当前目录
       else if (!checkProjPull(elementPath)) { // 有修改
-        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有冲突, 需要手动更新.`
+        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下更新代码失败, 请自行检查网络等原因或手动更新.`
         outputOverAll.push(msg)
         shelljs.echo(msg)
       }
@@ -669,25 +669,20 @@ function checkProjBranchAndTag(checkPath: string, element: string, modules: Airo
   }
 
   if (airModule && airModule.branch) {
-    shelljs.exec('git checkout ' + airModule.branch, { silent: true })
-    const result = shelljs.exec('echo $?', { silent: true }).trim()
-    shelljs.echo(` 结果 ${result == '0'} `)
-    if (result == '0') {
+    const result = shelljs.exec('git checkout ' + airModule.branch, { silent: true })
+    if (result.code == 0) {
       return true
     } else {
       return false;
     }
   }
   else if (airModule && airModule.tag) {
-    shelljs.exec(`git checkout -b ${airModule.tag} ${airModule.tag}`, { silent: true })
-    const result = shelljs.exec('echo $?', { silent: true }).trim()
-    if (result == '0') {
+    const result = shelljs.exec(`git checkout -b ${airModule.tag} ${airModule.tag}`, { silent: true })
+    if (result.code == 0) {
       return true
     } else { // 建 Tag 失败，则
-      shelljs.exec(`git checkout ${airModule.tag}`)
-      const result2 = shelljs.exec('echo $?').trim()
-      shelljs.echo(` 结果 ${result2} `)
-      if (result2 == '0') {
+      const result2 = shelljs.exec(`git checkout ${airModule.tag}`)
+      if (result2.code == 0) {
         return true
       } else { // 切 Tag 失败，报错之
         return false;
@@ -734,7 +729,11 @@ function checkProjPull(checkPath: string): boolean {
     shelljs.exit(1);
   }
 
-  const result = shelljs.exec('git pull --rebase', { silent: true })
+  const result = shelljs.exec('git pull --rebase', { silent: true, fatal: true })
+  if (result.code != 0) {
+    shelljs.echo(` git 更新失败，请检查命令当前网络环境`)
+    return false;
+  }
   const resultList = result.toString().split('\n')
   if (resultList.length > 0) {
     const lastLine = resultList[resultList.length - 1]
