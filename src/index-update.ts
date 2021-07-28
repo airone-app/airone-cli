@@ -729,24 +729,13 @@ function checkProjPull(checkPath: string): boolean {
     shelljs.exit(1);
   }
 
-  const result = shelljs.exec('git pull --rebase', { silent: true, fatal: true })
+  const result = shelljs.exec('git pull --rebase', { fatal: true })
   if (result.code != 0) {
     shelljs.echo(` git 更新失败，请检查命令当前网络环境`)
-    return false;
-  }
-  const resultList = result.toString().split('\n')
-  if (resultList.length > 0) {
-    const lastLine = resultList[resultList.length - 1]
-    const lastLine2 = resultList[resultList.length - 2]
-    if (lastLine.toLowerCase().indexOf('is up to date') != -1
-          || lastLine.toLowerCase().indexOf('already up to date') != -1) {
-      shelljs.echo(` 更新成功 ！`)
-      return true;
-    } else if (lastLine2.toLowerCase().indexOf('is up to date') != -1
-                || lastLine2.toLowerCase().indexOf('already up to date') != -1) {
-      shelljs.echo(` 更新成功 ！`)
-      return true;
-    }
+    return false
+  } else {
+    shelljs.echo(` 更新成功 ！`)
+    return true
   }
 
   return false;
