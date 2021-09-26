@@ -620,6 +620,8 @@ async function updateModules(dirPath: string) {
         continue;
       }
       shelljs.cd(elementPath)
+      //  fetch in proj first
+      fetchProject(elementPath)
       // 1. 先检查此目录是否有修改
       if (!checkProjModify(elementPath)) { // 有修改
         const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有改动还未提交，请先提交之.`
@@ -693,8 +695,23 @@ function checkProjBranchAndTag(checkPath: string, element: string, modules: Airo
   return true;
 }
 
-function checkProjModify(checkPath: string): boolean {
+
+function fetchProject(checkPath: string): boolean {
   shelljs.echo('-------------------------')
+  shelljs.echo('-n', `* fetch目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...\n`)
+
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  const result = shelljs.exec('git remote show origin; git remote prune origin; git fetch --all', { silent: true })
+
+  return true;
+}
+
+function checkProjModify(checkPath: string): boolean {
   shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}，检查是否有改动未提交...`)
 
   if (!shelljs.which('git')) {
@@ -704,20 +721,12 @@ function checkProjModify(checkPath: string): boolean {
   }
 
   const result = shelljs.exec('git status', { silent: true })
-  const resultList = result.toString().split('\n')
-  if (resultList.length > 0) {
-    const lastLine = resultList[resultList.length - 1]
-    const lastLine2 = resultList[resultList.length - 2]
-    if (lastLine.indexOf('nothing to commit') != -1) {
-      shelljs.echo(`clean ！`)
-      return true;
-    } else if (lastLine2.indexOf('nothing to commit') != -1) {
-      shelljs.echo(`clean ！`)
-      return true;
-    }
+  if (result.code != 0) {
+    return false;
   }
 
-  return false;
+  shelljs.echo(`clean ！`)
+  return true;
 }
 
 function checkProjPull(checkPath: string): boolean {

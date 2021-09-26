@@ -1,6 +1,6 @@
 {
   "name": "airone",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "airone cli -- an amazing tool to generate hybrid modularized app or related module with one key. \n",
   "main": "dist/index.js",
   "scripts": {
