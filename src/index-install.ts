@@ -36,7 +36,7 @@ const ERROR_MSG = `${pkg.name} 更新失败，请重试或手动更新`;
 var ModuleName: string | null = null
 
 // 新建 program 对象，全局命令行对象
-const program = new Command(pkg.name)
+const program = new Command(pkg.name + ' install')
 const spinner = OraJS()
 
 // ---- 项目配置文件框架
@@ -108,7 +108,7 @@ program
 
 //#region [scaffold] 脚手架方法
 
-const timeConsumingCmd = (cmd: string, tips: string = '处理中，请稍候'): Promise<{ code: number, stdout: string, stderr: string }> => {
+const timeConsumingCmd = (cmd: string, tips: string = 'Processing, please wait...'): Promise<{ code: number, stdout: string, stderr: string }> => {
   return new Promise((resolve, reject) => {
     spinner.start(tips)
     shelljs.exec(cmd, (code, stdout, stderr) => {

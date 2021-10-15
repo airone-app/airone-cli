@@ -282,7 +282,7 @@ async function newModule() {
 
 //#region [scaffold]      脚手架方法
 
-const timeConsumingCmd = (cmd: string, tips: string = '处理中，请稍候'): Promise<{ code: number, stdout: string, stderr: string }> => {
+const timeConsumingCmd = (cmd: string, tips: string = 'Processing, please wait...'): Promise<{ code: number, stdout: string, stderr: string }> => {
   return new Promise((resolve, reject) => {
     spinner.start(tips)
     shelljs.exec(cmd, (code, stdout, stderr) => {
@@ -422,9 +422,11 @@ program
 program
   .command('update [module]', 'update one or all air-modules （only update the exist module and will show tips of modified module）').alias('u')
 
-
 program
   .command('dev', 'airone develop tools')
+
+program
+  .command('tag', 'Actions about git tag')
 
 //#endregion
 
@@ -442,6 +444,7 @@ program
 //#endregion
 
 
+
 //#region [sub] command - Init
 
 program
@@ -457,7 +460,9 @@ program
   .action(() => {
     newCommand()
   })
+
 //#endregion
+
 
 
 //#region [interface]     定义及处理参数

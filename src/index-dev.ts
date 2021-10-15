@@ -104,7 +104,7 @@ program
 
 //#region [scaffold] 脚手架方法
 
-const timeConsumingCmd = (cmd: string, tips: string = '处理中，请稍候'): Promise<{ code: number, stdout: string, stderr: string }> => {
+const timeConsumingCmd = (cmd: string, tips: string = 'Processing, please wait...'): Promise<{ code: number, stdout: string, stderr: string }> => {
   return new Promise((resolve, reject) => {
     spinner.start(tips)
     shelljs.exec(cmd, (code, stdout, stderr) => {

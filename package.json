@@ -1,6 +1,6 @@
 {
   "name": "airone",
-  "version": "1.1.9",
+  "version": "2.0.0",
   "description": "airone cli -- an amazing tool to generate hybrid modularized app or related module with one key. \n",
   "main": "dist/index.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "bin": {
     "airone": "dist/index.js",
     "airone-install": "dist/index-install.js",
+    "airone-tag": "dist/index-tag.js",
     "airone-dev": "dist/index-dev.js",
     "airone-update": "dist/index-update.js"
   },

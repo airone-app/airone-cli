@@ -32,11 +32,11 @@ const GLOBAL_REPOSITORY_PACKAGE = path.join(GLOBAL_REPOSITORY_DIR, 'package.json
 var PROJECT_DIR = shelljs.pwd().toString()
 const PROJECT_CONFIG_NAME = 'airone.json'
 var PROJECT_CONFIG_PATH = path.join(PROJECT_DIR, PROJECT_CONFIG_NAME)
-const ERROR_MSG = `${pkg.name} 更新失败，请重试或手动更新`;
+const ERROR_MSG = `${pkg.name} 更新Failure，请重试或手动更新`;
 var ModuleName: string | null = null
 
 // 新建 program 对象，全局命令行对象
-const program = new Command(pkg.name)
+const program = new Command(pkg.name + ' update')
 const spinner = OraJS()
 
 // ---- 项目配置文件框架
@@ -81,7 +81,7 @@ interface Config {
 program.addHelpText('before', `
 安装 air 模块命令。
 1. 直接运行(不带参数):  ${pkg.name} install 根据工程目录 airone.json 安装配置中的所有依赖模块。
-2. 安装指定 air 模块:  ${pkg.name} install xx，安装指定的 air 模块，安装成功后会更新 airone.json。
+2. 安装指定 air 模块:  ${pkg.name} install xx，安装指定的 air 模块，安装Success后会更新 airone.json。
 `);
 
 // 版本号
@@ -110,7 +110,23 @@ program
 
 //#region [scaffold] 脚手架方法
 
-const timeConsumingCmd = (cmd: string, tips: string = '处理中，请稍候'): Promise<{ code: number, stdout: string, stderr: string }> => {
+/**
+ * 安全删除方法，将之移入项目根目录中的 .trash 中，以今日时间戳（精确到小时）命名
+ * @param desPath
+ */
+const safeRemove = (desPath: string) => {
+  // 今日时间戳（精确到小时）
+  const timestamp = DateUtil.currentDateStringWithFormat('yyyy-M-d-h-m')
+  // 根据时间戳创建垃圾桶
+  const trashDir = path.join(PROJECT_DIR, '.trash', timestamp)
+  if (!fs.existsSync(trashDir)) {
+    shelljs.mkdir('-p', trashDir)
+  }
+  shelljs.mv('-f', desPath, trashDir)
+  shelljs.echo('Safe delete file:' + desPath + ', the file is move to: ' + trashDir)
+}
+
+const timeConsumingCmd = (cmd: string, tips: string = 'Processing, please wait...'): Promise<{ code: number, stdout: string, stderr: string }> => {
   return new Promise((resolve, reject) => {
     spinner.start(tips)
     shelljs.exec(cmd, (code, stdout, stderr) => {
@@ -158,7 +174,7 @@ const autoUpdate = async () => {
     }
   }
 
-  // 更新 git 成功则判断版本号是否需要升级
+  // 更新 git Success则判断版本号是否需要升级
   if (!fs.existsSync(GLOBAL_REPOSITORY_PACKAGE)) { // 更新的命令文件不在
     shelljs.echo(ERROR_MSG);
     return
@@ -179,7 +195,7 @@ const autoUpdate = async () => {
   shelljs.cd(GLOBAL_REPOSITORY_DIR)
   const result = (await timeConsumingCmd(`npm install 1>&- 2>&-; npm run build 1>&- 2>&-; npm link 1>&- 2>&-`, `正在安装最新版 ${pkg.name}`)).code
   if (result == 0) {
-    console.log('更新成功，当前最新版本：' + versionOfNewGit);
+    console.log('更新Success，当前最新版本：' + versionOfNewGit);
     // 更新全局配置
     const globalConfig = loadConfig() as Config
     globalConfig.lastUpdate = DateUtil.currentDateStringWithFormat("yyyy-M-d");
@@ -338,7 +354,7 @@ async function updateAironeJson(module: string): Promise<[string, AironeModule]>
 /** 下载单个模块 */
 async function downloadModule(module: AironeModule, dir: string) {
   if (fs.existsSync(dir)) { // 若模块已存在，删除之
-    shelljs.rm('-rf', dir)
+    safeRemove(dir)
   }
 
   // 下载 git
@@ -353,9 +369,9 @@ async function downloadModule(module: AironeModule, dir: string) {
 
   // 结果处理
   if (code == 0) {
-    console.log(`模块 ${module.name} 已下载成功.`);
+    console.log(`模块 ${module.name} 已下载Success.`);
   } else {
-    console.log(`模块 ${module.name} 下载失败`);
+    console.log(`模块 ${module.name} 下载Failure`);
     shelljs.exit(-1)
   }
 }
@@ -390,7 +406,7 @@ async function addModule(module: AironeModule, dir: string) {
       updateModule(module, moduleDir)
       return;
     } else {
-      shelljs.rm('-rf', moduleDir);
+      safeRemove(moduleDir)
       fs.mkdirSync(moduleDir)
     }
   }
@@ -589,7 +605,7 @@ async function updateModules(dirPath: string) {
         } else {
           shelljs.echo(`删除非 airone.json 中配置的模块： "${element}" `)
         }
-        shelljs.rm('-rf', elementPath)
+        safeRemove(elementPath);
         ArrayUtil.remove(lsResult, element)
       }
     }
@@ -620,8 +636,19 @@ async function updateModules(dirPath: string) {
         continue;
       }
       shelljs.cd(elementPath)
+
+      // 取之 airModule
+      let airModule: AironeModule | null = null
+      for (const module of projectConfig.devModules) {
+        if (module.name == element) {
+          airModule = module
+          break;
+        }
+      }
+
       //  fetch in proj first
       fetchProject(elementPath)
+
       // 1. 先检查此目录是否有修改
       if (!checkProjModify(elementPath)) { // 有修改
         const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有改动还未提交，请先提交之.`
@@ -635,13 +662,13 @@ async function updateModules(dirPath: string) {
         shelljs.echo(msg)
       }
       // 3. 更新当前目录
-      else if (!checkProjPull(elementPath)) { // 有修改
-        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下更新代码失败, 请自行检查网络等原因或手动更新.`
+      else if (airModule?.tag == undefined && !checkProjPull(elementPath)) { // 有修改
+        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下更新代码Failure, 请自行检查网络等原因或手动更新.`
         outputOverAll.push(msg)
         shelljs.echo(msg)
       }
       else {
-        outputOverAll.push(`√ ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 更新成功！`)
+        outputOverAll.push(`√ ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 更新Success！`)
       }
 
       // 即出目录
@@ -673,22 +700,21 @@ function checkProjBranchAndTag(checkPath: string, element: string, modules: Airo
   if (airModule && airModule.branch) {
     const result = shelljs.exec('git checkout ' + airModule.branch, { silent: true })
     if (result.code == 0) {
+      shelljs.echo('Checkout branch:' + airModule.branch + ' - Success!')
       return true
     } else {
+      shelljs.echo('Checkout branch:' + airModule.branch + ' - Failure!')
       return false;
     }
   }
   else if (airModule && airModule.tag) {
-    const result = shelljs.exec(`git checkout -b ${airModule.tag} ${airModule.tag}`, { silent: true })
+    const result = shelljs.exec(`git checkout ${airModule.tag}`, { silent: true })
     if (result.code == 0) {
+      shelljs.echo('Checkout tag:' + airModule.tag + ' - Success!')
       return true
-    } else { // 建 Tag 失败，则
-      const result2 = shelljs.exec(`git checkout ${airModule.tag}`)
-      if (result2.code == 0) {
-        return true
-      } else { // 切 Tag 失败，报错之
-        return false;
-      }
+    } else { // 建 Tag Failure，则
+      shelljs.echo('Checkout tag:' + airModule.tag + ' - Failure!')
+      return false;
     }
   }
 
@@ -740,10 +766,10 @@ function checkProjPull(checkPath: string): boolean {
 
   const result = shelljs.exec('git pull --rebase', { fatal: true })
   if (result.code != 0) {
-    shelljs.echo(` git 更新失败，请检查命令当前网络环境`)
+    shelljs.echo(` git 更新Failure，请检查命令当前网络环境`)
     return false
   } else {
-    shelljs.echo(` 更新成功 ！`)
+    shelljs.echo(` 更新Success ！`)
     return true
   }
 
@@ -776,7 +802,6 @@ async function main() {
   let androidDir = path.join(PROJECT_DIR, 'android')
   let modulesDir = path.join(PROJECT_DIR, 'modules')
   let devModulesDir = path.join(PROJECT_DIR, 'devModules')
-
 
   const options = program.opts();
 
