@@ -73,7 +73,8 @@ interface Config {
 program.addHelpText('before', `${pkg.description}latest version: ${pkg.version}\n`);
 
 // 版本号
-program.version(pkg.version, '-v, --version', 'Print the current version');
+// program.version(pkg.version, '-v, --version', 'Print the current version');
+program.version(pkg.version, '-v, --version', '打印版本信息');
 
 // 作者
 
@@ -81,9 +82,12 @@ program.version(pkg.version, '-v, --version', 'Print the current version');
 // program.on('--help', () => { })
 
 // 使用示例
+// program.addHelpText('after', `
+// run "${pkg.name} -h | --help" for help.
+// You can also use "${pkg.name} command -h" to check the specific command such as "${pkg.name} install -h".
+// `);
 program.addHelpText('after', `
-run "${pkg.name} -h | --help" for help.
-You can also use "${pkg.name} command -h" to check the specific command such as "${pkg.name} install -h".
+您还可以运行： "${pkg.name} command -h" 来查看单个具体命令的帮助，比如您想知道 install 命令的用法，只需敲入 "${pkg.name} install -h".
 `);
 
 //#endregion
@@ -417,16 +421,20 @@ const saveConfig = (config: Config, configPath?: string): void => {
 //#region [sub] command - 导入外部命令
 
 program
-  .command('install [module]', 'Install one or more air-module (this operation will rewrite the exist module)').alias('i')
+  // .command('install [module]', 'Install one or more air-module (this operation will rewrite the exist module)').alias('i')
+  .command('install [module]', '安装指定的模块(module)，不带模块将根据 airone.json 配置安装所有模块(注意：install 将重写已有模块)').alias('i')
 
 program
-  .command('update [module]', 'update one or all air-modules （only update the exist module and will show tips of modified module）').alias('u')
+  // .command('update [module]', 'update one or all air-modules （only update the exist module and will show tips of modified module）').alias('u')
+  .command('update [module]', '更新指定的模块(module)，不带模块将根据 airone.json 配置更新所有模块').alias('u')
 
 program
-  .command('dev', 'airone develop tools')
+  // .command('dev', 'airone develop tools')
+  .command('dev', 'airone 开发者工具')
 
 program
-  .command('tag', 'Actions about git tag')
+  // .command('tag', 'Actions about git tag')
+  .command('tag', '提供一些 tag 相关便利操作')
 
 //#endregion
 
@@ -449,14 +457,16 @@ program
 
 program
   .command('init')
-  .description('Initialize an airone project')
+  .description('在当前目录初始化一个 airone 主项目')
+  // .description('Initialize an airone project')
   .action(() => {
     initProject()
   })
 
 program
   .command('new')
-  .description('Generate an airone new module or plugin')
+  .description('生成一个 airone 模块(module)或插件(plugin)')
+  // .description('Generate an airone new module or plugin')
   .action(() => {
     newCommand()
   })

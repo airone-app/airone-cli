@@ -79,9 +79,9 @@ interface Config {
 
 // 版本信息
 program.addHelpText('before', `
-安装 air 模块命令。
-1. 直接运行(不带参数):  ${pkg.name} install 根据工程目录 airone.json 安装配置中的所有依赖模块。
-2. 安装指定 air 模块:  ${pkg.name} install xx，安装指定的 air 模块，安装Success后会更新 airone.json。
+更新 air 模块命令。
+1. 直接运行(不带参数):  ${pkg.name} update           根据工程目录 airone.json 更新配置中的所有依赖模块。
+2. 安装指定 air 模块 :  ${pkg.name} update [module]，更新指定的 air 模块，更新完成后会更新 airone.json。
 `);
 
 // 版本号
@@ -94,7 +94,7 @@ program.addHelpText('before', `
 
 // 使用示例
 program.addHelpText('after', `
-运行 ${pkg.name} install -h | --help 查看命令使用。
+运行 ${pkg.name} update -h | --help 查看命令使用。
 `);
 
 program
@@ -104,7 +104,9 @@ program
   })
 
 program
-  .option('-f, --force', 'force update, this option will remove the files that not exist in airone.json');
+  // .option('-f, --force', 'force update, this option will remove the files that not exist in airone.json');
+  .option('-f, --force', '强制更新，不在 airone.json 中的模块、目录、文件都会移入 .trash 回收站目录');
+
 //#endregion
 
 
@@ -123,7 +125,7 @@ const safeRemove = (desPath: string) => {
     shelljs.mkdir('-p', trashDir)
   }
   shelljs.mv('-f', desPath, trashDir)
-  shelljs.echo('Safe delete file:' + desPath + ', the file is move to: ' + trashDir)
+  shelljs.echo('目录被安全地删除:' + desPath + ', 注意，目录未被真实删除，只是移入回收站对应目录: ' + trashDir)
 }
 
 const timeConsumingCmd = (cmd: string, tips: string = 'Processing, please wait...'): Promise<{ code: number, stdout: string, stderr: string }> => {
@@ -738,7 +740,7 @@ function fetchProject(checkPath: string): boolean {
 }
 
 function checkProjModify(checkPath: string): boolean {
-  shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}，检查是否有改动未提交...`)
+  shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)} 是否有改动未提交...`)
 
   if (!shelljs.which('git')) {
     //在控制台输出内容
@@ -746,8 +748,8 @@ function checkProjModify(checkPath: string): boolean {
     shelljs.exit(1);
   }
 
-  const result = shelljs.exec('git status', { silent: true })
-  if (result.code != 0) {
+  const result = shelljs.exec('git status -s', { silent: true })
+  if (result.code != 0 || result.toString().length > 0) {
     return false;
   }
 

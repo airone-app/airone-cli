@@ -113,7 +113,7 @@ program
   .description('Sync the tag of all modules with remote')
   .action(() => {
     CMD = 'sync'
-  })
+  });
 
 //#endregion
 
@@ -133,7 +133,7 @@ program
     shelljs.mkdir('-p', trashDir)
   }
   shelljs.mv('-f', desPath, trashDir)
-  shelljs.echo('Safe delete file:' + desPath + ', the file is move to: ' + trashDir)
+  shelljs.echo('目录被安全地删除:' + desPath + ', 注意，目录未被真实删除，只是移入回收站对应目录: ' + trashDir)
 }
 
 const timeConsumingCmd = (cmd: string, tips: string = 'Processing, please wait...\n'): Promise<{ code: number, stdout: string, stderr: string }> => {
@@ -311,7 +311,7 @@ async function main() {
 
   if (CMD === 'sync') {
     if (!fs.existsSync(PROJECT_CONFIG_PATH)) {
-      shelljs.echo('Please run this command in an airone project')
+      shelljs.echo('请在 airone 项目中运行命令')
       shelljs.exit(-1)
     }
 

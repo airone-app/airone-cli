@@ -108,6 +108,22 @@ program
 
 //#region [scaffold] 脚手架方法
 
+/**
+ * 安全删除方法，将之移入项目根目录中的 .trash 中，以今日时间戳（精确到小时）命名
+ * @param desPath
+ */
+const safeRemove = (desPath: string) => {
+  // 今日时间戳（精确到小时）
+  const timestamp = DateUtil.currentDateStringWithFormat('yyyy-M-d-h-m')
+  // 根据时间戳创建垃圾桶
+  const trashDir = path.join(PROJECT_DIR, '.trash', timestamp)
+  if (!fs.existsSync(trashDir)) {
+    shelljs.mkdir('-p', trashDir)
+  }
+  shelljs.mv('-f', desPath, trashDir)
+  shelljs.echo('目录被安全地删除:' + desPath + ', 注意，目录未被真实删除，只是移入回收站对应目录: ' + trashDir)
+}
+
 const timeConsumingCmd = (cmd: string, tips: string = 'Processing, please wait...'): Promise<{ code: number, stdout: string, stderr: string }> => {
   return new Promise((resolve, reject) => {
     spinner.start(tips)
@@ -336,7 +352,7 @@ async function updateAironeJson(module: string): Promise<[string, AironeModule]>
 /** 下载单个模块 */
 async function downloadModule(module: AironeModule, dir: string) {
   if (fs.existsSync(dir)) { // 若模块已存在，删除之
-    shelljs.rm('-rf', dir)
+    safeRemove(dir)
   }
 
   // 下载 git
@@ -388,7 +404,7 @@ async function updateModules(modules: Array<AironeModule>, dir: string) {
       shelljs.echo('用户取消操作！');
       shelljs.exit(-1)
     } else {
-      shelljs.rm('-rf', dir);
+      safeRemove(dir)
       fs.mkdirSync(dir)
     }
   }
@@ -430,7 +446,7 @@ async function addModule(module: AironeModule, dir: string) {
       updateModule(module, moduleDir)
       return;
     } else {
-      shelljs.rm('-rf', moduleDir);
+      safeRemove(moduleDir)
       fs.mkdirSync(moduleDir)
     }
   }
