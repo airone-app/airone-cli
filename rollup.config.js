@@ -71,6 +71,25 @@ const defaultConfig = [{
     terser()
   ]
 },{
+  input: './src/index-checkout.ts',
+  output: {
+    file: './dist/index-checkout.js',
+    format: 'cjs',
+    banner: '#!/usr/bin/env node',
+    globals
+  },
+  external,
+  plugins: [
+    typescript2({
+      exclude: 'node_modules/**',
+      useTsconfigDeclarationDir: true,
+      typescript,
+      tsconfig: './tsconfig.json'
+    }),
+    json(),
+    terser()
+  ]
+},{
   input: './src/index-tag.ts',
   output: {
     file: './dist/index-tag.js',

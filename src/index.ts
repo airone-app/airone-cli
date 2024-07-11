@@ -428,6 +428,8 @@ program
   // .command('update [module]', 'update one or all air-modules （only update the exist module and will show tips of modified module）').alias('u')
   .command('update [module]', '更新指定的模块(module)，不带模块将根据 airone.json 配置更新所有模块').alias('u')
 
+program.command('checkout <branch>', '切换到指定分支')
+
 program
   // .command('dev', 'airone develop tools')
   .command('dev', 'airone 开发者工具')
