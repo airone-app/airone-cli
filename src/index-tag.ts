@@ -37,8 +37,7 @@ var IosDir: string;
 var AndroidDir: string;
 var ModulesDir: string;
 var DevModulesDir: string;
-/** tag Name */
-var TagName: string | null = null
+
 /** tag 子命令 */
 var CMD: string | null = null
 
@@ -110,18 +109,19 @@ Run ${pkg.name} tag -h | --help for more help。
 //   })
 
 
-program
-  .arguments('<tagName>')
-  .action((op) => {
-    TagName = op
-  })
-
 // 命令
 program
   .command('sync')
   .description('Sync the tag of all modules with remote')
   .action(() => {
     CMD = 'sync'
+  });
+
+program
+  .command('make')
+  .description('Make tag for all modules')
+  .action(() => {
+    CMD = 'make'
   });
 
 //#endregion
@@ -294,6 +294,7 @@ async function syncTagOfPath(desPath: string) {
 
 //#region [main]  tag modules
 const outputOverAll: string[] = []
+const pushOverAll: string[] = []
 async function tagModules(dirPath: string) {
   if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
     return;
@@ -344,7 +345,11 @@ async function tagModules(dirPath: string) {
     }
   }
 
-  shelljs.echo(outputOverAll.join('\n')) 
+  shelljs.echo(outputOverAll.join('\n'))
+  if (pushOverAll.length > 0) {
+    shelljs.echo('------------- Push Result ------------')
+    shelljs.echo(pushOverAll.join('\n')) 
+  }
   saveConfig(projectConfig, PROJECT_CONFIG_PATH)
 }
 
@@ -367,20 +372,22 @@ function tagProj(checkPath: string, element: string, modules: AironeModule[]): b
   }
 
   if (airModule && airModule.tag) {
-    shelljs.echo('Skip tag')
+    shelljs.echo('continue')
     return true
   }
 
-  if (airModule && TagName) {
-    const result = shelljs.exec('git tag ' + TagName, { silent: true })
+  if (airModule && airModule.branch) {
+    const tagName = airModule.branch.split('_')[1]
+    const result = shelljs.exec('git tag ' + tagName, { silent: true })
     if (result.code == 0) {
-      shelljs.exec('git checkout ' + TagName, { silent: true })
-      shelljs.echo('tag: ' + TagName + ' - Success!')
+      const pushResult = shelljs.exec('git push origin ' + tagName, { silent: true })
+      pushOverAll.push('Push tag: ' + tagName + (pushResult.code === 0 ? ' - Success!' : ' - Failure!'))
+      shelljs.echo('Make tag: ' + tagName + ' - Success!')
       airModule.branch = undefined
-      airModule.tag = TagName
+      airModule.tag = tagName
       return true
     } else {
-      shelljs.echo('tag: ' + TagName + ' - Failure!')
+      shelljs.echo('Make tag: ' + tagName + ' - Failure!')
       return false
     }
   }
@@ -442,11 +449,9 @@ async function main() {
   if (CMD === 'sync') {
     await syncTagOfPath(PROJECT_DIR)
     await syncTagOfDir(DevModulesDir)
-    return
+  } else if (CMD === 'make') {
+    await tagModules(DevModulesDir)
   }
-
-  await tagModules(DevModulesDir)
-
 }
 
 
