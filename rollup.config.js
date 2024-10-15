@@ -71,9 +71,9 @@ const defaultConfig = [{
     terser()
   ]
 },{
-  input: './src/index-checkout.ts',
+  input: './src/index-branch.ts',
   output: {
-    file: './dist/index-checkout.js',
+    file: './dist/index-branch.js',
     format: 'cjs',
     banner: '#!/usr/bin/env node',
     globals
