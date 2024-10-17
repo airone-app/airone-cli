@@ -37,6 +37,7 @@ var IosDir: string;
 var AndroidDir: string;
 var ModulesDir: string;
 var DevModulesDir: string;
+
 /** tag 子命令 */
 var CMD: string | null = null
 
@@ -107,12 +108,20 @@ Run ${pkg.name} tag -h | --help for more help。
 //     CMD = op
 //   })
 
+
 // 命令
 program
   .command('sync')
   .description('Sync the tag of all modules with remote')
   .action(() => {
     CMD = 'sync'
+  });
+
+program
+  .command('make')
+  .description('Make tag for all modules')
+  .action(() => {
+    CMD = 'make'
   });
 
 //#endregion
@@ -283,6 +292,128 @@ async function syncTagOfPath(desPath: string) {
 
 //#endregion
 
+//#region [main]  tag modules
+const outputOverAll: string[] = []
+const pushOverAll: string[] = []
+async function tagModules(dirPath: string) {
+  if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+    return;
+  }
+
+  var lsResult: string[] = fs.readdirSync(dirPath);
+  const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
+
+  outputOverAll.splice(0, outputOverAll.length);
+  outputOverAll.push('\n\n')
+  outputOverAll.push('------------- 结果汇总 ------------')
+  for (let index = 0; index < lsResult.length; index++) {
+    const element = lsResult[index];
+    const elementPath = path.join(dirPath, element)
+    if (fs.statSync(elementPath).isDirectory()) {
+      if (!fs.existsSync(path.join(elementPath, './.git'))) {
+        continue;
+      }
+      shelljs.cd(elementPath)
+
+      // 取之 airModule
+      let airModule: AironeModule | null = null
+      for (const module of projectConfig.devModules) {
+        if (module.name == element) {
+          airModule = module
+          break;
+        }
+      }
+
+      // 1. 先检查此目录是否有修改
+      if (!checkProjModify(elementPath)) { // 有修改
+        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有改动还未提交，请先提交之.`
+        outputOverAll.push(msg)
+        shelljs.echo(msg)
+      }
+      // 2. 更新 branch
+      else if (!tagProj(elementPath, element, projectConfig.devModules)) {
+        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} tag报错，请自行检查 `
+        outputOverAll.push(msg)
+        shelljs.echo(msg)
+      }
+      else {
+        outputOverAll.push(`√ ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} tag Success！`)
+      }
+
+      // 即出目录
+      shelljs.cd('..')
+    }
+  }
+
+  shelljs.echo(outputOverAll.join('\n'))
+  if (pushOverAll.length > 0) {
+    shelljs.echo('------------- Push Result ------------')
+    shelljs.echo(pushOverAll.join('\n')) 
+  }
+  saveConfig(projectConfig, PROJECT_CONFIG_PATH)
+}
+
+function tagProj(checkPath: string, element: string, modules: AironeModule[]): boolean {
+  shelljs.echo('-n', `* 检查分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
+
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  // 取之 airModule
+  let airModule: AironeModule | null = null
+  for (const module of modules) {
+    if (module.name == element) {
+      airModule = module
+      break
+    }
+  }
+
+  if (airModule && airModule.tag) {
+    shelljs.echo('continue')
+    return true
+  }
+
+  if (airModule && airModule.branch) {
+    const tagName = airModule.branch.split('_')[1]
+    const result = shelljs.exec('git tag ' + tagName, { silent: true })
+    if (result.code == 0) {
+      const pushResult = shelljs.exec('git push origin ' + tagName, { silent: true })
+      pushOverAll.push('Push tag: ' + tagName + (pushResult.code === 0 ? ' - Success!' : ' - Failure!'))
+      shelljs.echo('Make tag: ' + tagName + ' - Success!')
+      airModule.branch = undefined
+      airModule.tag = tagName
+      return true
+    } else {
+      shelljs.echo('Make tag: ' + tagName + ' - Failure!')
+      return false
+    }
+  }
+
+  return false
+}
+
+function checkProjModify(checkPath: string): boolean {
+  shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)} 是否有改动未提交...`)
+
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  const result = shelljs.exec('git status -s', { silent: true })
+  if (result.code != 0 || result.toString().length > 0) {
+    return false;
+  }
+
+  shelljs.echo(`clean ！`)
+  return true;
+}
+//#endregion
+
 
 //#region [interface]  命令行定义及处理参数
 
@@ -309,16 +440,18 @@ async function main() {
 
   const options = program.opts();
 
-  if (CMD === 'sync') {
-    if (!fs.existsSync(PROJECT_CONFIG_PATH)) {
-      shelljs.echo('请在 airone 项目中运行命令')
-      shelljs.exit(-1)
-    }
-
-    await syncTagOfPath(PROJECT_DIR)
-    await syncTagOfDir(DevModulesDir)
+  if (!fs.existsSync(PROJECT_CONFIG_PATH)) {
+    shelljs.echo('请在 airone 项目中运行命令')
+    shelljs.exit(-1)
+    return
   }
 
+  if (CMD === 'sync') {
+    await syncTagOfPath(PROJECT_DIR)
+    await syncTagOfDir(DevModulesDir)
+  } else if (CMD === 'make') {
+    await tagModules(DevModulesDir)
+  }
 }
 
 

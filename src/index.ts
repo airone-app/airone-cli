@@ -436,6 +436,10 @@ program
   // .command('tag', 'Actions about git tag')
   .command('tag', '提供一些 tag 相关便利操作')
 
+program
+  // .command('tag', 'Actions about git tag')
+  .command('branch', '提供一些 branch 相关便利操作')
+
 //#endregion
 
 
