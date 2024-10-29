@@ -440,6 +440,8 @@ program
   // .command('tag', 'Actions about git tag')
   .command('branch', '提供一些 branch 相关便利操作')
 
+program.command('release', '一键合并子模块代码到master')
+
 //#endregion
 
 
@@ -482,7 +484,7 @@ program
 //#region [interface]     定义及处理参数
 
 async function main() {
-  await checkAndAutoUpgrade()
+  // await checkAndAutoUpgrade()
   shelljs.cd(PROJECT_DIR)
   program.parse(process.argv)
 }
