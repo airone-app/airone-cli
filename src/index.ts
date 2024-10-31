@@ -484,7 +484,7 @@ program
 //#region [interface]     定义及处理参数
 
 async function main() {
-  // await checkAndAutoUpgrade()
+  await checkAndAutoUpgrade()
   shelljs.cd(PROJECT_DIR)
   program.parse(process.argv)
 }
