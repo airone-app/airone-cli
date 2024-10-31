@@ -371,7 +371,7 @@ function mergeBranch(checkPath: string, element: string, modules: AironeModule[]
 
   if (airModule && airModule.branch && BranchName) {
     fetchProject(checkPath)
-    const result = shelljs.exec('git merge --ff-only origin/' + BranchName, { fatal: true })
+    const result = shelljs.exec('git merge origin/' + BranchName, { fatal: true })
     if (result.code == 0) {
       shelljs.echo('Merge branch: ' + BranchName + ' - Success!')
       return true

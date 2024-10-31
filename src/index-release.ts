@@ -33,10 +33,9 @@ var PROJECT_DIR = shelljs.pwd().toString()
 const PROJECT_CONFIG_NAME = 'airone.json'
 var PROJECT_CONFIG_PATH = path.join(PROJECT_DIR, PROJECT_CONFIG_NAME)
 const ERROR_MSG = `${pkg.name} 更新Failure，请重试或手动更新`;
-var BranchName: string | null = null
 
 // 新建 program 对象，全局命令行对象
-const program = new Command(pkg.name + ' update')
+const program = new Command(pkg.name + ' release')
 const spinner = OraJS()
 
 // ---- 项目配置文件框架
@@ -76,16 +75,8 @@ interface Config {
 //#region [main]     命令行基本信息
 
 // 版本信息
-program.addHelpText('before', `
-一键切换 air 模块分支命令
-检测 airone.json 中配置为 branch 的模块，并切换到指定分支
-`);
+program.addHelpText('before', `一键发布子模块代码指令, 即合并代码到master分支`);
 
-program
-  .arguments('<branch>')
-  .action((op) => {
-    BranchName = op
-  })
 
 //#region [scaffold] 脚手架方法
 
@@ -137,7 +128,7 @@ const saveConfig = (config: Config, configPath?: string): void => {
 
 //#region [main]  checkout modules
 const outputOverAll: string[] = []
-async function checkoutModules(dirPath: string) {
+async function releaseModules(dirPath: string) {
   if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
     return;
   }
@@ -166,20 +157,31 @@ async function checkoutModules(dirPath: string) {
         }
       }
 
+      if (airModule == null || airModule?.tag) {
+        shelljs.echo(`√ ${airModule?.name} Already Update`)
+        shelljs.cd('..')
+        continue
+      }
+
       // 1. 先检查此目录是否有修改
       if (!checkProjModify(elementPath)) { // 有修改
-        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有改动还未提交，请先提交之.`
+        const msg = `X ${airModule?.name} 下有改动还未提交，请先提交之.`
         outputOverAll.push(msg)
         shelljs.echo(msg)
       }
-      // 2. 更新 branch
-      else if (!checkProjBranch(elementPath, element, projectConfig.devModules)) {
-        const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 切分支报错，请自行检查 `
+      // 2. 更新master分支
+      else if (!updateMaster(airModule)) {
+        const msg = `X ${airModule?.name} 更新master分支报错，请自行检查 `
         outputOverAll.push(msg)
         shelljs.echo(msg)
+      }
+      else if (!mergeToMaster(airModule)) {
+        const msg = `X ${airModule?.name} 合并到master报错，请自行检查 `
+        outputOverAll.push(msg)
+        shelljs.echo(msg) 
       }
       else {
-        outputOverAll.push(`√ ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 切换Success！`)
+        outputOverAll.push(`√ ${airModule?.name} Success！`)
       }
 
       // 即出目录
@@ -191,59 +193,65 @@ async function checkoutModules(dirPath: string) {
   saveConfig(projectConfig, PROJECT_CONFIG_PATH)
 }
 
-function checkProjBranch(checkPath: string, element: string, modules: AironeModule[]): boolean {
-  shelljs.echo('-n', `* 检查分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
-
-  if (!shelljs.which('git')) {
-    //在控制台输出内容
-    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
-    shelljs.exit(1);
-  }
-
-  // 取之 airModule
-  let airModule: AironeModule | null = null
-  for (const module of modules) {
-    if (module.name == element) {
-      airModule = module
-      break
-    }
-  }
-
-  if (airModule && airModule.branch && BranchName) {
-    const result = shelljs.exec('git checkout -b' + BranchName, { silent: true })
-    if (result.code == 0) {
-      shelljs.echo('Checkout branch:' + BranchName + ' - Success!')
-      airModule.branch = BranchName
-      return true
-    } else {
-      const isSuccess = shelljs.exec('git checkout ' + BranchName, { silent: true }).code == 0
-      if (isSuccess) airModule.branch = BranchName
-      const msg = isSuccess ? ' - Success!' : ' - Failure!'
-      shelljs.echo('Checkout branch:' + BranchName + msg)
-      return isSuccess
-    }
-  }
-
-  return true
-}
-
 function checkProjModify(checkPath: string): boolean {
-  shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)} 是否有改动未提交...`)
-
   if (!shelljs.which('git')) {
     //在控制台输出内容
     shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
     shelljs.exit(1);
   }
+
+  shelljs.echo('-n', `* 检查目录： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)} 是否有改动未提交...`)
 
   const result = shelljs.exec('git status -s', { silent: true })
   if (result.code != 0 || result.toString().length > 0) {
+    shelljs.echo(`dirty ！`)
     return false;
   }
 
   shelljs.echo(`clean ！`)
   return true;
 }
+
+function updateMaster(airModule: AironeModule | null): boolean {
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  shelljs.echo('-n', `* update master： ${airModule?.name}...`)
+
+  if (airModule && airModule.branch) {
+    const result = shelljs.exec(`git checkout master; git reset --hard origin/master; git pull -r origin`, { silent: true })
+    if (result.code == 0) {
+      shelljs.echo('Success!')
+      return true
+    }
+  }
+
+  shelljs.echo('Failure!')
+  return false
+}
+
+function mergeToMaster(airModule: AironeModule | null): boolean {
+  if (!shelljs.which('git')) {
+    //在控制台输出内容
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之.');
+    shelljs.exit(1);
+  }
+
+  shelljs.echo(`* 合并到master： ${airModule?.name}...`)
+
+  if (airModule && airModule.branch) {
+    const result = shelljs.exec(`git merge ${airModule.branch}; git push origin`, { fatal: true })
+    if (result.code == 0) {
+      return true
+    }
+  }
+
+  return false
+}
+
 //#endregion
 
 
@@ -274,8 +282,8 @@ async function main() {
   const options = program.opts();
 
   const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
-  await checkoutModules(modulesDir)
-  await checkoutModules(devModulesDir)
+  // await releaseModules(modulesDir)
+  await releaseModules(devModulesDir)
 
 }
 
