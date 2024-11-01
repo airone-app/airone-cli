@@ -324,6 +324,8 @@ async function tagModules(dirPath: string) {
         }
       }
 
+      if (airModule && airModule.tag) continue
+
       // 1. 先检查此目录是否有修改
       if (!checkProjModify(elementPath)) { // 有修改
         const msg = `X ${elementPath.substring(elementPath.lastIndexOf('/') + 1)} 下有改动还未提交，请先提交之.`
@@ -354,7 +356,7 @@ async function tagModules(dirPath: string) {
 }
 
 function tagProj(checkPath: string, element: string, modules: AironeModule[]): boolean {
-  shelljs.echo('-n', `* 检查分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
+  shelljs.echo(`* tag模块： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
 
   if (!shelljs.which('git')) {
     //在控制台输出内容
@@ -378,16 +380,12 @@ function tagProj(checkPath: string, element: string, modules: AironeModule[]): b
 
   if (airModule && airModule.branch) {
     const tagName = airModule.branch.split('_')[1]
-    const result = shelljs.exec('git tag ' + tagName, { silent: true })
+    const result = shelljs.exec(`git checkout master; git tag ${tagName}; git push origin ${tagName}`, { fatal: true })
     if (result.code == 0) {
-      const pushResult = shelljs.exec('git push origin ' + tagName, { silent: true })
-      pushOverAll.push('Push tag: ' + tagName + (pushResult.code === 0 ? ' - Success!' : ' - Failure!'))
-      shelljs.echo('Make tag: ' + tagName + ' - Success!')
       airModule.branch = undefined
       airModule.tag = tagName
       return true
     } else {
-      shelljs.echo('Make tag: ' + tagName + ' - Failure!')
       return false
     }
   }

@@ -222,7 +222,7 @@ function updateMaster(airModule: AironeModule | null): boolean {
   shelljs.echo('-n', `* update master： ${airModule?.name}...`)
 
   if (airModule && airModule.branch) {
-    const result = shelljs.exec(`git checkout master; git reset --hard origin/master; git pull -r origin`, { silent: true })
+    const result = shelljs.exec(`git checkout master; git fetch origin; git pull -r origin`, { silent: true })
     if (result.code == 0) {
       shelljs.echo('Success!')
       return true
@@ -243,8 +243,11 @@ function mergeToMaster(airModule: AironeModule | null): boolean {
   shelljs.echo(`* 合并到master： ${airModule?.name}...`)
 
   if (airModule && airModule.branch) {
-    const result = shelljs.exec(`git merge ${airModule.branch}; git push origin`, { fatal: true })
+    const tagName = airModule.branch.split('_')[1]
+    const result = shelljs.exec(`git merge origin/${airModule.branch}; git tag ${tagName}; git push origin master --tags`, { fatal: true })
     if (result.code == 0) {
+      airModule.branch = undefined
+      airModule.tag = tagName
       return true
     }
   }
