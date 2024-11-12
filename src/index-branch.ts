@@ -277,7 +277,7 @@ function checkProjBranchAndTag(checkPath: string, element: string, modules: Airo
 }
 
 function makeBranch(checkPath: string, element: string, modules: AironeModule[]): boolean {
-  shelljs.echo('-n', `* 操作分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
+  shelljs.echo(`* 操作分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
 
   if (!shelljs.which('git')) {
     //在控制台输出内容
@@ -295,25 +295,20 @@ function makeBranch(checkPath: string, element: string, modules: AironeModule[])
   }
 
   if (airModule && airModule.branch && BranchName) {
-    const result = shelljs.exec('git branch ' + BranchName, { silent: true })
+    const result = shelljs.exec(`git branch ${BranchName}; git push origin -u ${BranchName}`, { fatal: true })
     if (result.code == 0) {
-      shelljs.echo('-n', 'Make branch: ' + BranchName + ' - Success!...')
       airModule.branch = BranchName
-      const pushResult = shelljs.exec('git push origin -u ' + BranchName, { silent: true })
-      shelljs.echo('Push branch: ' + BranchName + (pushResult.code === 0 ? ' - Success!' : ' - Failed!'))
       return true
     } else {
-      shelljs.echo('Make branch: ' + BranchName + ' - Failed!')
       return false
     }
   }
-  shelljs.echo('HEAD detached...continue');
 
-  return true
+  return false
 }
 
 function renameBranch(checkPath: string, element: string, modules: AironeModule[]): boolean {
-  shelljs.echo('-n', `* 操作分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
+  shelljs.echo(`* 操作分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
 
   if (!shelljs.which('git')) {
     //在控制台输出内容
@@ -332,27 +327,20 @@ function renameBranch(checkPath: string, element: string, modules: AironeModule[
 
   if (airModule && airModule.branch && BranchName) {
     const oldBranch = airModule.branch
-    const result = shelljs.exec('git branch -m ' + oldBranch + ' ' + BranchName, { silent: true })
+    const result = shelljs.exec(`git branch -m ${oldBranch} ${BranchName}; git push origin -d ${oldBranch}; git push origin -u ${BranchName}`, { fatal: true })
     if (result.code == 0) {
-      shelljs.echo('-n', 'Rename branch: ' + BranchName + ' - Success!...')
       airModule.branch = BranchName
-      const deleteResult = shelljs.exec('git push origin -d ' + oldBranch, { silent: true })
-      shelljs.echo('-n', 'Delete remote branch: ' + oldBranch + (deleteResult.code === 0 ? ' - Success!...' : ' - Failed!...'))
-      const pushResult = shelljs.exec('git push origin -u ' + BranchName, { silent: true })
-      shelljs.echo('Push branch: ' + BranchName + (pushResult.code === 0 ? ' - Success!' : ' - Failed!'))
       return true
     } else {
-      shelljs.echo('Rename branch:' + BranchName + ' - Failed!')
       return false
     }
   }
-  shelljs.echo('HEAD detached...continue');
 
-  return true
+  return false
 }
 
 function mergeBranch(checkPath: string, element: string, modules: AironeModule[]): boolean {
-  shelljs.echo('-n', `* 操作分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
+  shelljs.echo(`* 操作分支： ${checkPath.substring(checkPath.lastIndexOf('/') + 1)}...`)
 
   if (!shelljs.which('git')) {
     //在控制台输出内容
@@ -371,18 +359,15 @@ function mergeBranch(checkPath: string, element: string, modules: AironeModule[]
 
   if (airModule && airModule.branch && BranchName) {
     fetchProject(checkPath)
-    const result = shelljs.exec('git merge origin/' + BranchName, { fatal: true })
+    const result = shelljs.exec(`git merge origin/${BranchName}; git push origin ${BranchName}`, { fatal: true })
     if (result.code == 0) {
-      shelljs.echo('Merge branch: ' + BranchName + ' - Success!')
       return true
     } else {
-      shelljs.echo('Merge branch: ' + BranchName + ' - Failed!')
       return false
     }
   }
-  shelljs.echo('HEAD detached...continue');
 
-  return true
+  return false
 }
 
 function checkProjModify(checkPath: string): boolean {
