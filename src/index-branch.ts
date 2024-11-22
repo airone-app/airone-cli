@@ -221,7 +221,7 @@ async function execCmd(dirPath: string) {
 }
 
 function fetchProject(checkPath: string): boolean {
-  shelljs.echo('-n', `fetch remote...`)
+  shelljs.echo('fetch remote...')
 
   if (!shelljs.which('git')) {
     //在控制台输出内容
@@ -359,7 +359,24 @@ function mergeBranch(checkPath: string, element: string, modules: AironeModule[]
 
   if (airModule && airModule.branch && BranchName) {
     fetchProject(checkPath)
-    const result = shelljs.exec(`git merge origin/${BranchName}; git push origin ${BranchName}`, { fatal: true })
+    // 执行git merge
+    const mergeResult = shelljs.exec(`git merge origin/${BranchName}`, { fatal: true });
+    
+    // 检查merge是否有冲突
+    if (mergeResult.code !== 0) {
+      shelljs.echo('git merge 发生冲突，请手动解决');
+      return false;
+    }
+
+    // 检查是否存在未解决的冲突文件
+    const conflictFiles = shelljs.exec('git diff --name-only --diff-filter=U', { silent: true });
+    if (conflictFiles.stdout) {
+      shelljs.echo('git merge 冲突文件:');
+      shelljs.echo(conflictFiles.stdout);
+      return false;
+    }
+
+    const result = shelljs.exec(`git push origin ${airModule.branch}`, { fatal: true })
     if (result.code == 0) {
       return true
     } else {
