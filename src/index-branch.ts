@@ -359,6 +359,14 @@ function mergeBranch(checkPath: string, element: string, modules: AironeModule[]
 
   if (airModule && airModule.branch && BranchName) {
     fetchProject(checkPath)
+
+    // 检查远程分支是否存在
+    const remoteBranchCheck = shelljs.exec(`git ls-remote --heads origin ${BranchName}`, { silent: true });
+    if (!remoteBranchCheck.stdout) {
+      shelljs.echo(`远程分支 ${BranchName} 不存在`);
+      return true;
+    }
+
     // 执行git merge
     const mergeResult = shelljs.exec(`git merge origin/${BranchName}`, { fatal: true });
     
