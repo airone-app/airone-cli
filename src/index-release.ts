@@ -136,6 +136,21 @@ async function releaseModules(dirPath: string) {
   var lsResult: string[] = fs.readdirSync(dirPath);
   const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
 
+  // 添加用户确认
+  const prompt = [
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: '此操作将合并代码到master分支并创建tag，是否继续？',
+      default: false
+    }
+  ]
+  const { confirm } = await inquirer.prompt(prompt);
+  if (!confirm) {
+    console.log('操作已取消');
+    return;
+  }
+
   outputOverAll.splice(0, outputOverAll.length);
   outputOverAll.push('\n\n')
   outputOverAll.push('------------- 结果汇总 ------------')
