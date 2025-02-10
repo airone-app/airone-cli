@@ -1,6 +1,6 @@
 {
   "name": "airone",
-  "version": "2.0.11",
+  "version": "2.0.12",
   "description": "airone cli -- 优雅的app组件化管理命令行工具，帮助您一键生成组件化app及方便地管理组件与项目. \nairone cli -- an amazing tool to generate hybrid modularized app or related module with one key. \n",
   "main": "dist/index.js",
   "scripts": {
