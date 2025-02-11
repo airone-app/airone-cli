@@ -306,7 +306,7 @@ async function checkAndAutoUpgrade(force: boolean = false) {
 
     const currentDate = DateUtil.currentDateStringWithFormat("yyyy-M-d");
     if (config.lastUpgrade == currentDate) {
-      // return;
+      return;
     }
     console.log(`${pkg.name} 每日更新检查中，请稍等...`);
 
