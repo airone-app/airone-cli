@@ -90,6 +90,25 @@ const defaultConfig = [{
     terser()
   ]
 },{
+  input: './src/index-merge.ts',
+  output: {
+    file: './dist/index-merge.js',
+    format: 'cjs',
+    banner: '#!/usr/bin/env node',
+    globals
+  },
+  external,
+  plugins: [
+    typescript2({
+      exclude: 'node_modules/**',
+      useTsconfigDeclarationDir: true,
+      typescript,
+      tsconfig: './tsconfig.json'
+    }),
+    json(),
+    terser()
+  ]
+},{
   input: './src/index-release.ts',
   output: {
     file: './dist/index-release.js',
