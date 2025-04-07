@@ -304,7 +304,7 @@ async function mergeMainProject(branchName?: string): Promise<boolean> {
   shelljs.cd(PROJECT_DIR);
 
   // 更新 master 分支
-  const updateResult = shelljs.exec('git checkout master; git fetch origin; git pull -r origin', { silent: true });
+  const updateResult = shelljs.exec('git checkout master; git fetch origin; git pull -r origin master', { silent: false });
   if (updateResult.code !== 0) {
     shelljs.echo('更新主工程 master 分支失败！');
     shelljs.cd(currentDir);
