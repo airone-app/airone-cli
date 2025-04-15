@@ -136,21 +136,6 @@ async function releaseModules(dirPath: string) {
   var lsResult: string[] = fs.readdirSync(dirPath);
   const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
 
-  // 添加用户确认
-  const prompt = [
-    {
-      type: 'confirm',
-      name: 'confirm',
-      message: '此操作将合并代码到master分支并创建tag，是否继续？',
-      default: false
-    }
-  ]
-  const { confirm } = await inquirer.prompt(prompt);
-  if (!confirm) {
-    console.log('操作已取消');
-    return;
-  }
-
   outputOverAll.splice(0, outputOverAll.length);
   outputOverAll.push('\n\n')
   outputOverAll.push('------------- 结果汇总 ------------')
@@ -275,35 +260,131 @@ function mergeToMaster(airModule: AironeModule | null): boolean {
 
 //#region [interface]  命令行定义及处理参数
 
-program.parse(process.argv)
+program
+  .arguments('[branch]')
+  .action(async (branch) => {
+    await main(branch);
+  });
 
 //#endregion
 
 
-async function main() {
-  // 目录自动搜索
-  console.log(`解析项目配置文件 ${PROJECT_CONFIG_PATH}`);
-  if (!fs.existsSync(PROJECT_CONFIG_PATH)) {
-    PROJECT_CONFIG_PATH = path.join(PROJECT_DIR, '../' + PROJECT_CONFIG_NAME);
-    console.log(`解析项目配置文件 ${PROJECT_CONFIG_PATH}`);
-    if (!fs.existsSync(PROJECT_CONFIG_PATH)) {
-      console.log(`项目配置文件 ${PROJECT_CONFIG_NAME} 不存在，请确认当前是否在 ${pkg.name} 项目根目录。`);
-      shelljs.exit(-1)
-    }
+async function mergeMainProject(branchName?: string): Promise<boolean> {
+  if (!shelljs.which('git')) {
+    shelljs.echo('本工具需要请安装 git，检查到系统尚未安装，请安装之。');
+    shelljs.exit(1);
   }
-  PROJECT_DIR = PROJECT_CONFIG_PATH.substr(0, PROJECT_CONFIG_PATH.length - PROJECT_CONFIG_NAME.length)
-  let iosDir = path.join(PROJECT_DIR, 'ios')
-  let androidDir = path.join(PROJECT_DIR, 'android')
-  let modulesDir = path.join(PROJECT_DIR, 'modules')
-  let devModulesDir = path.join(PROJECT_DIR, 'devModules')
 
-  const options = program.opts();
+  // 检查主工程是否有未提交的更改
+  if (!checkProjModify(PROJECT_DIR)) {
+    shelljs.echo('主工程有未提交的更改，请先处理。');
+    return false;
+  }
 
-  const projectConfig: AironeConfig = loadConfig(PROJECT_CONFIG_PATH) as AironeConfig
-  // await releaseModules(modulesDir)
-  await releaseModules(devModulesDir)
+  // 如果未指定分支，获取当前分支
+  if (!branchName) {
+    const currentBranchResult = shelljs.exec('git symbolic-ref --short HEAD', { silent: true });
+    if (currentBranchResult.code !== 0) {
+      shelljs.echo('获取当前分支失败！');
+      return false;
+    }
+    branchName = currentBranchResult.stdout.trim();
+  }
 
+  // 如果当前已经是master分支，提示并退出
+  if (branchName === 'master') {
+    shelljs.echo('当前已经在master分支，无需合并！');
+    return false;
+  }
+
+  shelljs.echo(`* 正在合并分支 ${branchName} 到 master...`);
+
+  // 切换到主工程目录
+  const currentDir = shelljs.pwd().toString();
+  shelljs.cd(PROJECT_DIR);
+
+  // 更新 master 分支
+  const updateResult = shelljs.exec('git checkout master; git fetch origin; git pull -r origin master', { silent: false });
+  if (updateResult.code !== 0) {
+    shelljs.echo('更新主工程 master 分支失败！');
+    shelljs.cd(currentDir);
+    return false;
+  }
+
+  // 合并指定分支到 master
+  const mergeResult = shelljs.exec(`git merge origin/${branchName}`, { silent: false });
+  if (mergeResult.code !== 0) {
+    shelljs.echo(`合并主工程分支 ${branchName} 到 master 失败！请手动解决冲突。`);
+    shelljs.cd(currentDir);
+    return false;
+  }
+
+  // 推送 master 分支到远程仓库
+  shelljs.echo(`* 推送主工程 master 分支到远程仓库...`);
+  const pushResult = shelljs.exec('git push origin master', { silent: false });
+  if (pushResult.code !== 0) {
+    shelljs.echo('推送主工程 master 分支到远程仓库失败！');
+    shelljs.cd(currentDir);
+    return false;
+  }
+
+  shelljs.echo(`主工程分支 ${branchName} 已成功合并到 master！`);
+  shelljs.cd(currentDir);
+  return true;
 }
 
+async function main(branchName?: string) {
+  PROJECT_DIR = PROJECT_CONFIG_PATH.substr(0, PROJECT_CONFIG_PATH.length - PROJECT_CONFIG_NAME.length);
 
-main()
+  // 获取当前分支（用于显示在确认提示中）
+  let displayBranch = branchName;
+  if (!displayBranch) {
+    const currentDir = shelljs.pwd().toString();
+    shelljs.cd(PROJECT_DIR);
+    const currentBranchResult = shelljs.exec('git symbolic-ref --short HEAD', { silent: true });
+    shelljs.cd(currentDir);
+    if (currentBranchResult.code === 0) {
+      displayBranch = currentBranchResult.stdout.trim();
+    } else {
+      displayBranch = "当前分支";
+    }
+  }
+
+  // 添加用户确认
+  const prompt = [
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: `确认将分支 ${displayBranch} 合并到 master 分支吗？`,
+      default: false
+    }
+  ];
+  const { confirm } = await inquirer.prompt(prompt);
+  if (!confirm) {
+    console.log('合并操作已取消');
+    return;
+  }
+  
+  // 合并主工程
+  const mergeSuccess = await mergeMainProject(branchName);
+  if (!mergeSuccess) {
+    console.log('主工程合并失败，终止子模块合并');
+    return;
+  }
+  
+ // 目录自动搜索
+ console.log(`解析项目配置文件 ${PROJECT_CONFIG_PATH}`);
+ if (!fs.existsSync(PROJECT_CONFIG_PATH)) {
+   PROJECT_CONFIG_PATH = path.join(PROJECT_DIR, '../' + PROJECT_CONFIG_NAME);
+   console.log(`解析项目配置文件 ${PROJECT_CONFIG_PATH}`);
+   if (!fs.existsSync(PROJECT_CONFIG_PATH)) {
+     console.log(`项目配置文件 ${PROJECT_CONFIG_NAME} 不存在，请确认当前是否在 ${pkg.name} 项目根目录。`);
+     shelljs.exit(-1);
+   }
+ }
+
+  let devModulesDir = path.join(PROJECT_DIR, 'devModules');
+  await releaseModules(devModulesDir);
+}
+
+program.parse(process.argv);
