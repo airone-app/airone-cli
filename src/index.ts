@@ -365,7 +365,8 @@ async function autoUpgrade() {
     shelljs.echo(ERROR_MSG + `(code ${result})`);
   }
 
-  shelljs.exit(0)
+  // 检查更新结束后不退出
+  // shelljs.exit(0)
 }
 
 /** 读配置文件（如果不给地址，配置文件将默认存储在系统用户根目录） */
