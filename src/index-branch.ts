@@ -77,8 +77,21 @@ interface Config {
 
 // 版本信息
 program.addHelpText('before', `
-一键操作 air 模块分支命令
-检测 airone.json 中配置为 branch 的模块，并执行对应操作
+Airone Branch Command:
+
+  基于当前分支创建新分支，或重命名当前分支。
+
+  用法示例:
+    $ airone branch new_feature         # 创建名为 new_feature 的新分支
+    $ airone branch -r hotfix_branch    # 将当前分支重命名为 hotfix_branch
+
+  操作流程:
+  1. 询问用户确认操作。
+  2. 检查主工程和各子模块是否有未提交的更改。
+  3. 更新主工程和各子模块的当前分支代码。
+  4. 对主工程执行分支创建/重命名操作。
+  5. 对符合条件的子模块 (配置了 branch 且与主工程当前分支一致) 执行分支创建/重命名操作。
+  6. 更新 airone.json 中子模块的 branch 配置 (如果是重命名或创建成功)。
 `);
 
 program

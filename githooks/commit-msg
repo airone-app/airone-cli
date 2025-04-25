@@ -1,0 +1,120 @@
+#!/usr/bin/env sh
+
+# 获取提交信息文件的路径
+COMMIT_MSG_FILE=$1
+
+# 读取提交信息的第一行 (Header)
+# 去除可能存在的前后空白字符
+FIRST_LINE=$(head -n1 "$COMMIT_MSG_FILE" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+# 定义允许的 commit 类型
+ALLOWED_TYPES="config|feat|fix|docs|res|style|perf|test|build|ci|revert"
+
+# 核心提交信息格式 (无平台标识)
+CORE_REGEX="^($ALLOWED_TYPES)(\([a-zA-Z0-9_-]+\))?\!?: .+$"
+
+# --- 自动检测平台 ---
+detected_platform=""
+platform_count=0
+platforms_list="" # 用于存储检测到的平台列表字符串
+
+# 获取暂存文件列表
+staged_files=$(git diff --cached --name-only --diff-filter=ACMRTUXB)
+
+if [ -z "$staged_files" ]; then
+  echo "ℹ️ 没有检测到暂存文件，无法自动推断平台。" >&2
+else
+  # 使用临时文件存储检测到的平台
+  TMP_PLATFORMS=$(mktemp)
+  SORTED_TMP_PLATFORMS=$(mktemp) # 存储排序去重后的平台
+
+  echo "$staged_files" | while IFS= read -r file; do
+    platform=""
+    case "$file" in
+      rn/*) platform="rn";;
+      ios/*) platform="ios";;
+      android/*) platform="android";;
+      # 其他路径不记录平台
+    esac
+    if [ -n "$platform" ]; then
+      echo "$platform" >> "$TMP_PLATFORMS"
+    fi
+  done
+
+  # 排序并去重平台
+  sort -u "$TMP_PLATFORMS" > "$SORTED_TMP_PLATFORMS"
+
+  # 计算唯一平台的数量 (使用 wc -l)
+  # 使用 tr -d ' ' 去除 wc -l 可能产生的空格
+  platform_count=$(wc -l < "$SORTED_TMP_PLATFORMS" | tr -d ' ')
+
+  # 读取排序后的平台列表用于显示
+  platforms_list=$(paste -sd ' ' "$SORTED_TMP_PLATFORMS")
+
+  # 清理临时文件
+  rm -f "$TMP_PLATFORMS"
+
+  # 根据平台数量设置 detected_platform
+  if [ "$platform_count" -eq 1 ]; then
+    detected_platform=$(head -n 1 "$SORTED_TMP_PLATFORMS") # 读取唯一的平台
+    echo "ℹ️ 根据文件变更自动检测到唯一平台: [$detected_platform]" >&2
+  elif [ "$platform_count" -gt 1 ]; then
+    echo "ℹ️ 检测到涉及多个平台 ($platforms_list) 的文件变更，不自动添加平台标识。" >&2
+  else
+     echo "ℹ️ 未检测到平台特定目录 (rn/, ios/, android/) 下的文件变更，不自动添加平台标识。" >&2
+     # platform_count 应该是 0
+  fi
+  # 清理排序后的临时文件
+  rm -f "$SORTED_TMP_PLATFORMS"
+fi
+# --- 平台检测结束 ---
+
+# 检查原始提交信息是否符合核心规范
+# 用户输入的 FIRST_LINE 必须直接匹配核心格式
+if ! echo "$FIRST_LINE" | grep -Eq "$CORE_REGEX"; then
+    echo "❌ 无效的提交信息格式!" >&2
+    echo "请确保提交信息的第一行遵循核心规范:" >&2
+    echo "  <type>[optional scope]: <description>" >&2
+    echo "允许的 type 包括: $ALLOWED_TYPES" >&2
+    echo "示例:" >&2
+    echo "  feat(login): 添加用户邮箱注册功能" >&2
+    echo "(平台标识 [rn], [ios], 或 [android] 将根据文件变更自动添加，请勿手动输入)" >&2
+    exit 1
+fi
+
+# 如果检测到唯一平台，则自动添加平台标识
+# 确保 platform_count 是数字再比较
+if [ "$platform_count" -eq 1 ] && [ -n "$detected_platform" ]; then
+  NEW_FIRST_LINE="[$detected_platform] $FIRST_LINE"
+  echo "✅ 自动添加平台标识: $NEW_FIRST_LINE" >&2
+
+  # 使用临时文件更新 commit message 文件
+  TMP_MSG_FILE=$(mktemp)
+  echo "$NEW_FIRST_LINE" > "$TMP_MSG_FILE"
+  # 将原始文件的第二行及以后内容追加到临时文件
+  tail -n +2 "$COMMIT_MSG_FILE" >> "$TMP_MSG_FILE"
+
+  # 替换原文件
+  if mv "$TMP_MSG_FILE" "$COMMIT_MSG_FILE"; then
+    : # 成功
+  else
+    echo "❌ 错误: 无法更新提交信息文件 '$COMMIT_MSG_FILE'" >&2
+    rm -f "$TMP_MSG_FILE" # 清理临时文件
+    exit 1
+  fi
+else
+  # 不需要添加平台标识的情况 (0 个或多个平台)
+  # 并且原始信息已通过核心格式检查
+  echo "✅ 提交信息符合核心规范，无需添加平台标识。" >&2
+  # 无需修改 COMMIT_MSG_FILE，因为 FIRST_LINE 未被修改
+fi
+
+# (可选) 检查描述长度或其他规则
+# 例如，检查 Header 是否超过特定字符数（需要考虑平台标识的长度）
+# header_length=$(echo "$FIRST_LINE" | wc -c)
+# if [ "$header_length" -gt 80 ]; then # 比如放宽到 80
+#   echo "⚠️ 警告: 提交信息的 Header 最好不要超过 80 个字符。" >&2
+# fi
+
+# 检查通过
+exit 0

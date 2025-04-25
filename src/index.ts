@@ -443,6 +443,8 @@ program.command('merge', '一键合并指定分支到模块分支')
 
 program.command('release', '一键合并子模块代码到master')
 
+program.command('hooks', 'git hooks 管理')
+
 //#endregion
 
 

@@ -75,7 +75,31 @@ interface Config {
 //#region [main]     命令行基本信息
 
 // 版本信息
-program.addHelpText('before', `一键发布子模块代码指令, 即合并代码到master分支`);
+program.addHelpText('before', `
+Airone Release Command:
+
+  将主工程和子模块的 *当前* (或指定) 分支合并到各自的 'master' 分支。
+
+  用法示例:
+    $ airone release          # 将主工程和子模块的 *当前* 分支合并到 master
+    $ airone release feature_branch # 将主工程和子模块的 feature_branch 分支合并到 master
+
+  操作流程:
+  1. 询问用户确认操作。
+  2. 处理主工程：
+     a. 检查是否有未提交的更改。
+     b. 切换到 'master' 分支并拉取最新代码。
+     c. 合并指定 (或当前) 分支到 'master'。
+     d. 推送 'master' 分支。
+  3. 如果主工程合并失败，则终止操作。
+  4. 处理 devModules 子模块 (跳过配置为 'tag' 的模块)：
+     a. 检查是否有未提交的更改。
+     b. 切换到 'master' 分支并拉取最新代码。
+     c. 合并 airone.json 中记录的该模块的开发分支到 'master'。
+     d. 基于开发分支名创建 Tag (例如: 'dev_v1.2.3' -> Tag 'v1.2.3')。
+     e. 推送 'master' 分支和新创建的 Tag。
+     f. 更新 airone.json，将该模块的 'branch' 配置移除，添加 'tag' 配置。
+`);
 
 
 //#region [scaffold] 脚手架方法

@@ -1,6 +1,6 @@
 {
   "name": "airone",
-  "version": "2.1.2",
+  "version": "2.1.4",
   "description": "airone cli -- 优雅的app组件化管理命令行工具，帮助您一键生成组件化app及方便地管理组件与项目. \nairone cli -- an amazing tool to generate hybrid modularized app or related module with one key. \n",
   "main": "dist/index.js",
   "scripts": {
@@ -17,7 +17,8 @@
     "airone-update": "dist/index-update.js",
     "airone-branch": "dist/index-branch.js",
     "airone-merge": "dist/index-merge.js",
-    "airone-release": "dist/index-release.js"
+    "airone-release": "dist/index-release.js",
+    "airone-hooks": "dist/index-hooks.js"
   },
   "author": "luochenxun (luochenxun@gmail.com)",
   "license": "ISC",
@@ -39,6 +40,7 @@
     "@types/shelljs": "^0.8.8",
     "@types/url-search-params": "^1.1.0",
     "rollup": "^2.39.0",
+    "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-terser": "^7.0.2",
     "rollup-plugin-typescript2": "^0.30.0",
     "typescript": "^4.1.5"
