@@ -2,6 +2,7 @@ import typescript from 'typescript'
 import json from '@rollup/plugin-json'
 import { terser } from 'rollup-plugin-terser'
 import typescript2 from 'rollup-plugin-typescript2'
+import copy from 'rollup-plugin-copy'
 
 import { dependencies } from './package.json'
 
@@ -30,7 +31,14 @@ const defaultConfig = [{
       tsconfig: './tsconfig.json'
     }),
     json(),
-    terser()
+    terser(),
+    copy({
+      targets: [
+        { src: 'githooks', dest: 'dist' }
+      ],
+      verbose: true,
+      hook: 'writeBundle'
+    })
   ]
 },{
   input: './src/index-install.ts',
@@ -150,6 +158,25 @@ const defaultConfig = [{
   input: './src/index-dev.ts',
   output: {
     file: './dist/index-dev.js',
+    format: 'cjs',
+    banner: '#!/usr/bin/env node',
+    globals
+  },
+  external,
+  plugins: [
+    typescript2({
+      exclude: 'node_modules/**',
+      useTsconfigDeclarationDir: true,
+      typescript,
+      tsconfig: './tsconfig.json'
+    }),
+    json(),
+    terser()
+  ]
+},{
+  input: './src/index-hooks.ts',
+  output: {
+    file: './dist/index-hooks.js',
     format: 'cjs',
     banner: '#!/usr/bin/env node',
     globals

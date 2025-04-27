@@ -77,8 +77,25 @@ interface Config {
 
 // 版本信息
 program.addHelpText('before', `
-一键合并模块分支命令
-检测 airone.json 中配置为 branch 的模块，并执行合并分支操作
+Airone Merge Command:
+
+  将指定的远程分支合并到各子模块的 *当前* 分支。
+  **注意：此命令不会操作主工程的分支。**
+
+  用法示例:
+    $ airone merge feature_branch  # 将远程 feature_branch 合并到各子模块的当前分支
+
+  操作流程:
+  1. 询问用户确认操作。
+  2. 遍历 devModules 子模块：
+     a. 检查是否有未提交的更改。
+     b. 切换到 airone.json 中配置的分支。
+     c. 拉取当前分支的最新代码。
+     d. Fetch 远程仓库信息，检查要合并的远程分支是否存在。
+     e. 执行 'git merge origin/<指定的分支>'。
+     f. 如果合并成功且无冲突，执行 'git push' 推送当前分支。
+     g. 如果远程分支不存在，则跳过。
+     h. 如果发生冲突，则提示用户手动解决。
 `);
 
 program
