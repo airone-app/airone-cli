@@ -305,7 +305,8 @@ function makeBranch(checkPath: string, element: string, modules: AironeModule[])
   }
 
   if (airModule && airModule.branch && BranchName) {
-    const result = shelljs.exec(`git branch ${BranchName}; git push origin -u ${BranchName}`, { fatal: true })
+    // 使用 && 链式执行 git 命令
+    const result = shelljs.exec(`git branch ${BranchName} && git push origin -u ${BranchName}`, { fatal: true })
     if (result.code == 0) {
       airModule.branch = BranchName
       return true
@@ -337,7 +338,8 @@ function renameBranch(checkPath: string, element: string, modules: AironeModule[
 
   if (airModule && airModule.branch && BranchName) {
     const oldBranch = airModule.branch
-    const result = shelljs.exec(`git branch -m ${oldBranch} ${BranchName}; git push origin -d ${oldBranch}; git push origin -u ${BranchName}`, { fatal: true })
+    // 使用 && 链式执行 git 命令
+    const result = shelljs.exec(`git branch -m ${oldBranch} ${BranchName} && git push origin -d ${oldBranch} && git push origin -u ${BranchName}`, { fatal: true })
     if (result.code == 0) {
       airModule.branch = BranchName
       return true
@@ -451,13 +453,13 @@ async function handleMainProject(currentBranch: string): Promise<boolean> {
   // 根据操作类型执行相应的分支操作
   if (options && options.rename) {
     shelljs.echo(`正在重命名主工程分支 ${currentBranch} 为 ${BranchName}...`);
-    // 执行重命名操作
-    const renameResult = shelljs.exec(`git branch -m ${currentBranch} ${BranchName}; git push origin -d ${currentBranch}; git push origin -u ${BranchName}`, { fatal: true });
+    // 执行重命名操作 - 使用 && 链式执行
+    const renameResult = shelljs.exec(`git branch -m ${currentBranch} ${BranchName} && git push origin -d ${currentBranch} && git push origin -u ${BranchName}`, { fatal: true });
     result = renameResult.code === 0;
   } else {
     shelljs.echo(`正在基于当前分支 ${currentBranch} 创建主工程分支 ${BranchName}...`);
-    // 执行创建操作
-    const createResult = shelljs.exec(`git branch ${BranchName}; git checkout ${BranchName}; git push origin -u ${BranchName}`, { fatal: true });
+    // 执行创建操作 - 使用 && 链式执行
+    const createResult = shelljs.exec(`git branch ${BranchName} && git checkout ${BranchName} && git push origin -u ${BranchName}`, { fatal: true });
     result = createResult.code === 0;
   }
 
