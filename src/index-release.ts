@@ -246,7 +246,7 @@ function updateMaster(airModule: AironeModule | null): boolean {
   shelljs.echo('-n', `* update master： ${airModule?.name}...`)
 
   if (airModule && airModule.branch) {
-    const result = shelljs.exec(`git checkout master; git fetch origin; git pull -r origin`, { silent: true })
+    const result = shelljs.exec(`git checkout master && git fetch origin && git pull -r origin`, { silent: true })
     if (result.code == 0) {
       shelljs.echo('Success!')
       return true
@@ -268,7 +268,7 @@ function mergeToMaster(airModule: AironeModule | null): boolean {
 
   if (airModule && airModule.branch) {
     const tagName = airModule.branch.split('_')[1]
-    const result = shelljs.exec(`git merge origin/${airModule.branch}; git tag ${tagName}; git push origin master --tags`, { fatal: true })
+    const result = shelljs.exec(`git merge origin/${airModule.branch} && git tag ${tagName} && git push origin master ${tagName}`, { fatal: true })
     if (result.code == 0) {
       airModule.branch = undefined
       airModule.tag = tagName
@@ -328,7 +328,7 @@ async function mergeMainProject(branchName?: string): Promise<boolean> {
   shelljs.cd(PROJECT_DIR);
 
   // 更新 master 分支
-  const updateResult = shelljs.exec('git checkout master; git fetch origin; git pull -r origin master', { silent: false });
+  const updateResult = shelljs.exec('git checkout master && git fetch origin && git pull -r origin master', { silent: false });
   if (updateResult.code !== 0) {
     shelljs.echo('更新主工程 master 分支失败！');
     shelljs.cd(currentDir);
