@@ -734,7 +734,7 @@ function fetchProject(checkPath: string): boolean {
     shelljs.exit(1);
   }
 
-  const result = shelljs.exec('git remote show origin; git remote prune origin; git fetch --all', { silent: true })
+  const result = shelljs.exec('git remote show origin; git remote prune origin; git fetch --all --tags --force', { silent: true })
 
   return true;
 }
