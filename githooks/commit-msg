@@ -7,13 +7,62 @@ COMMIT_MSG_FILE=$1
 # 去除可能存在的前后空白字符
 FIRST_LINE=$(head -n1 "$COMMIT_MSG_FILE" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
+# 检查是否为 Merge commit
+if echo "$FIRST_LINE" | grep -Eq "^Merge "; then
+  echo "ℹ️ 检测到 Merge commit，跳过检查。" >&2
+  exit 0
+fi
+
 # 定义允许的 commit 类型
 ALLOWED_TYPES="config|feat|fix|docs|res|style|perf|test|build|ci|revert"
 
 # 核心提交信息格式 (无平台标识)
-CORE_REGEX="^($ALLOWED_TYPES)(\([a-zA-Z0-9_-]+\))?\!?: .+$"
+# scope 支持除右括号外的所有字符
+CORE_REGEX="^($ALLOWED_TYPES)(\([^)]+\))?\!?: .+$"
+
+# 检查原始提交信息是否符合核心规范
+# 用户输入的 FIRST_LINE 必须直接匹配核心格式
+if ! echo "$FIRST_LINE" | grep -Eq "$CORE_REGEX"; then
+    echo "❌ 无效的提交信息格式!" >&2
+
+    # 尝试给出更具体的错误提示
+    # 1. 检查类型 (type)
+    if ! echo "$FIRST_LINE" | grep -Eq "^($ALLOWED_TYPES)"; then
+        echo "  - 错误提示: 提交类型 (type) 无效或缺失。请参考下方允许的类型列表。" >&2
+    # 2. 如果类型正确，检查带范围 (scope) 的情况
+    elif echo "$FIRST_LINE" | grep -Eq "^($ALLOWED_TYPES)\("; then # 匹配到类型后紧跟 '('，说明尝试使用 scope
+        if ! echo "$FIRST_LINE" | grep -Eq "^($ALLOWED_TYPES)\([^)]+\)"; then # scope 内容不符合 \([^)]+\) (例如为空: '()', 或缺少右括号)
+             echo "  - 错误提示: 范围 (scope) 格式无效。它应为 '(<scope_content>)' 且 <scope_content> 不能为空。" >&2
+        elif ! echo "$FIRST_LINE" | grep -Eq "^($ALLOWED_TYPES)\([^)]+\)\!?: "; then # scope 正确，但其后缺少 ': ' 或 '!:'
+             echo "  - 错误提示: 范围 (scope) '(...) '之后缺少冒号和空格 (': ')。" >&2
+        elif ! echo "$FIRST_LINE" | grep -Eq "^($ALLOWED_TYPES)\([^)]+\)\!?: .+"; then # scope 和冒号正确，但描述为空
+             echo "  - 错误提示: 提交描述 (description) 不能为空。" >&2
+        else
+             # 如果以上针对 scope 的特定检查都通过了，但整体 CORE_REGEX 仍失败，可能是更复杂的问题
+             echo "  - 错误提示: 请仔细检查范围 (scope) 或描述 (description) 的格式是否符合规范。" >&2
+        fi
+    # 3. 如果类型正确，且没有尝试使用 scope (即类型后没有 '(' )
+    elif ! echo "$FIRST_LINE" | grep -Eq "^($ALLOWED_TYPES)\!?: "; then # 类型后缺少 ': ' 或 '!:'
+        echo "  - 错误提示: 类型 (<type>) 之后缺少冒号和空格 (': ')。" >&2
+    # 4. 如果类型和冒号都正确 (无 scope)，但描述为空
+    elif ! echo "$FIRST_LINE" | grep -Eq "^($ALLOWED_TYPES)\!?: .+"; then
+        echo "  - 错误提示: 提交描述 (description) 不能为空。" >&2
+    else
+        # 其他未捕获的格式问题
+        echo "  - 错误提示: 请仔细检查提交信息的整体结构是否符合规范。" >&2
+    fi
+
+    echo "请确保提交信息的第一行遵循核心规范:" >&2
+    echo "  <type>[optional scope]: <description>" >&2
+    echo "允许的 type 包括: $ALLOWED_TYPES" >&2
+    echo "示例:" >&2
+    echo "  feat(login): 添加用户邮箱注册功能" >&2
+    echo "(平台标识如 [rn], [ios], [android] 或 [ios, android] 将根据文件变更自动添加，请勿手动输入)" >&2
+    exit 1
+fi
 
 # --- 自动检测平台 ---
+# 此时 FIRST_LINE 已通过核心格式校验
 detected_platform=""
 platform_count=0
 platforms_list="" # 用于存储检测到的平台列表字符串
@@ -22,7 +71,7 @@ platforms_list="" # 用于存储检测到的平台列表字符串
 staged_files=$(git diff --cached --name-only --diff-filter=ACMRTUXB)
 
 if [ -z "$staged_files" ]; then
-  echo "ℹ️ 没有检测到暂存文件，无法自动推断平台。" >&2
+  echo "ℹ️ 核心格式正确。没有检测到暂存文件，无法自动推断平台。" >&2
 else
   # 使用临时文件存储检测到的平台
   TMP_PLATFORMS=$(mktemp)
@@ -48,20 +97,26 @@ else
   # 使用 tr -d ' ' 去除 wc -l 可能产生的空格
   platform_count=$(wc -l < "$SORTED_TMP_PLATFORMS" | tr -d ' ')
 
-  # 读取排序后的平台列表用于显示
-  platforms_list=$(paste -sd ' ' "$SORTED_TMP_PLATFORMS")
-
+  # 读取排序后的平台列表用于显示和拼接
+  if [ "$platform_count" -gt 1 ]; then
+    platforms_list=$(paste -sd ', ' "$SORTED_TMP_PLATFORMS") # 使用 ", " 拼接
+  elif [ "$platform_count" -eq 1 ]; then
+    platforms_list=$(head -n 1 "$SORTED_TMP_PLATFORMS") # 单个平台
+  else
+    platforms_list="" # 没有平台
+  fi
+  
   # 清理临时文件
   rm -f "$TMP_PLATFORMS"
 
-  # 根据平台数量设置 detected_platform
+  # 根据平台数量设置 detected_platform 及提示信息
   if [ "$platform_count" -eq 1 ]; then
-    detected_platform=$(head -n 1 "$SORTED_TMP_PLATFORMS") # 读取唯一的平台
-    echo "ℹ️ 根据文件变更自动检测到唯一平台: [$detected_platform]" >&2
+    detected_platform=$platforms_list # detected_platform 仍然是单个平台名称
+    echo "ℹ️ 核心格式正确。根据文件变更自动检测到唯一平台: [$detected_platform]" >&2
   elif [ "$platform_count" -gt 1 ]; then
-    echo "ℹ️ 检测到涉及多个平台 ($platforms_list) 的文件变更，不自动添加平台标识。" >&2
+    echo "ℹ️ 核心格式正确。检测到涉及多个平台 ($platforms_list) 的文件变更。" >&2
   else
-     echo "ℹ️ 未检测到平台特定目录 (rn/, ios/, android/) 下的文件变更，不自动添加平台标识。" >&2
+     echo "ℹ️ 核心格式正确。未检测到平台特定目录 (rn/, ios/, android/) 下的文件变更，不自动添加平台标识。" >&2
      # platform_count 应该是 0
   fi
   # 清理排序后的临时文件
@@ -69,24 +124,11 @@ else
 fi
 # --- 平台检测结束 ---
 
-# 检查原始提交信息是否符合核心规范
-# 用户输入的 FIRST_LINE 必须直接匹配核心格式
-if ! echo "$FIRST_LINE" | grep -Eq "$CORE_REGEX"; then
-    echo "❌ 无效的提交信息格式!" >&2
-    echo "请确保提交信息的第一行遵循核心规范:" >&2
-    echo "  <type>[optional scope]: <description>" >&2
-    echo "允许的 type 包括: $ALLOWED_TYPES" >&2
-    echo "示例:" >&2
-    echo "  feat(login): 添加用户邮箱注册功能" >&2
-    echo "(平台标识 [rn], [ios], 或 [android] 将根据文件变更自动添加，请勿手动输入)" >&2
-    exit 1
-fi
-
-# 如果检测到唯一平台，则自动添加平台标识
+# 如果检测到平台 (单个或多个)，则自动添加平台标识
 # 确保 platform_count 是数字再比较
-if [ "$platform_count" -eq 1 ] && [ -n "$detected_platform" ]; then
-  NEW_FIRST_LINE="[$detected_platform] $FIRST_LINE"
-  echo "✅ 自动添加平台标识: $NEW_FIRST_LINE" >&2
+if [ "$platform_count" -ge 1 ] && [ -n "$platforms_list" ]; then
+  NEW_FIRST_LINE="[$platforms_list] $FIRST_LINE"
+  echo "✅ 自动添加平台标识: $NEW_FIRST_LINE" >&2 # 这表明原始 FIRST_LINE 核心格式正确
 
   # 使用临时文件更新 commit message 文件
   TMP_MSG_FILE=$(mktemp)
@@ -103,18 +145,11 @@ if [ "$platform_count" -eq 1 ] && [ -n "$detected_platform" ]; then
     exit 1
   fi
 else
-  # 不需要添加平台标识的情况 (0 个或多个平台)
-  # 并且原始信息已通过核心格式检查
+  # 不需要添加平台标识的情况 (0 个平台)
+  # 并且原始信息已通过核心格式检查 (因为检查在前面)
   echo "✅ 提交信息符合核心规范，无需添加平台标识。" >&2
   # 无需修改 COMMIT_MSG_FILE，因为 FIRST_LINE 未被修改
 fi
-
-# (可选) 检查描述长度或其他规则
-# 例如，检查 Header 是否超过特定字符数（需要考虑平台标识的长度）
-# header_length=$(echo "$FIRST_LINE" | wc -c)
-# if [ "$header_length" -gt 80 ]; then # 比如放宽到 80
-#   echo "⚠️ 警告: 提交信息的 Header 最好不要超过 80 个字符。" >&2
-# fi
 
 # 检查通过
 exit 0
